@@ -1,26 +1,87 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { PermissionGate } from "@/components/visualizer/PermissionGate";
+import { VisualizerStage } from "@/components/visualizer/VisualizerStage";
+import { ControlsDock, TopBadge } from "@/components/visualizer/ControlsDock";
+import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
+import { audioEngine } from "@/lib/audio/AudioEngine";
+import type { PresetId } from "@/components/visualizer/presets/types";
 
 export const Route = createFileRoute("/")({
   component: Index,
+  head: () => ({
+    meta: [
+      { title: "WAVE.FM — Mic-Reactive Visualizer" },
+      {
+        name: "description",
+        content:
+          "Play music near your phone and watch tunnels, plasma, glitches and liquid chrome react in real time.",
+      },
+    ],
+  }),
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
+function Index() {
+  const [started, setStarted] = useState(false);
+  const [preset, setPreset] = useState<PresetId>("tunnel");
+  const [sensitivity, setSensitivity] = useState(1.2);
+  const [videoOn, setVideoOn] = useState(true);
+  const [uiVisible, setUiVisible] = useState(true);
+  const hideTimer = useRef<number | null>(null);
+
+  const bump = () => {
+    setUiVisible(true);
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setUiVisible(false), 3500);
+  };
+
+  useEffect(() => {
+    if (!started) return;
+    bump();
+    return () => {
+      if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    };
+  }, [started]);
+
+  useEffect(() => {
+    return () => {
+      audioEngine.stop();
+    };
+  }, []);
+
+  if (!started) return <PermissionGate onReady={() => setStarted(true)} />;
+
   return (
     <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
+      className="relative h-[100dvh] w-screen overflow-hidden bg-black"
+      onPointerDown={bump}
+      onTouchStart={bump}
     >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+      <VideoBackdrop enabled={videoOn} />
+      <VisualizerStage preset={preset} />
+      <TopBadge preset={preset} visible={uiVisible} />
+      <ControlsDock
+        preset={preset}
+        setPreset={(p) => {
+          setPreset(p);
+          bump();
+        }}
+        sensitivity={sensitivity}
+        setSensitivity={(n) => {
+          setSensitivity(n);
+          bump();
+        }}
+        videoOn={videoOn}
+        setVideoOn={(v) => {
+          setVideoOn(v);
+          bump();
+        }}
+        onExit={() => {
+          audioEngine.stop();
+          setStarted(false);
+        }}
+        visible={uiVisible}
       />
     </div>
   );
-}
-
-function Index() {
-  return <PlaceholderIndex />;
 }
