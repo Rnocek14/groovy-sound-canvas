@@ -105,6 +105,7 @@ export class AudioEngine {
         beat: false, sinceBeat: 999, drop: false,
         energy: 0, flux: 0,
         phase: "intro", shortEnergy: 0, bpm: 0,
+        centroid: 0, percuss: 0, bassToTreble: 1,
       };
     }
     if (!this.startedAt) this.startedAt = now;
