@@ -15,6 +15,9 @@ export type AudioFrame = {
   phase: SongPhase;    // local song structure estimate
   shortEnergy: number; // ~3s window
   bpm: number;         // rough beat tempo estimate
+  centroid: number;    // 0..1 spectral centroid (brightness)
+  percuss: number;     // 0..1 percussiveness (transient density)
+  bassToTreble: number;// >1 = bass heavy, <1 = treble heavy
 };
 
 export class AudioEngine {
@@ -46,6 +49,7 @@ export class AudioEngine {
 
   // Spectral flux
   private prevFFT: Float32Array | null = null;
+  private percussEMA = 0;
 
   // Phase tracking
   private shortLevelEMA = 0;
@@ -102,6 +106,7 @@ export class AudioEngine {
         beat: false, sinceBeat: 999, drop: false,
         energy: 0, flux: 0,
         phase: "intro", shortEnergy: 0, bpm: 0,
+        centroid: 0, percuss: 0, bassToTreble: 1,
       };
     }
     if (!this.startedAt) this.startedAt = now;
@@ -201,6 +206,22 @@ export class AudioEngine {
     }
     const flux = Math.min(1, fluxSum / Math.max(1, this.fft.length * 0.05));
 
+    // Spectral centroid (brightness): weighted mean bin / nyquist
+    let csum = 0, cw = 0;
+    for (let i = 1; i < this.fft.length; i++) {
+      const v = this.fft[i] / 255;
+      csum += v * i;
+      cw += v;
+    }
+    const centroid = cw > 0 ? Math.min(1, (csum / cw) / this.fft.length * 2.2) : 0;
+
+    // Percussiveness = recent transient density (smoothed)
+    const transient = Math.max(0, this.levelEMA - this.shortLevelEMA);
+    this.percussEMA = this.percussEMA * 0.92 + Math.min(1, transient * 5) * 0.08;
+
+    // Bass-to-treble ratio (clamped)
+    const btr = (this.bassEMA + 0.02) / (this.trebleEMA + 0.02);
+
     // BPM from beat intervals (median of last N gaps)
     let bpm = 0;
     if (this.beatTimes.length >= 4) {
@@ -233,6 +254,9 @@ export class AudioEngine {
       phase: this.phase,
       shortEnergy: this.shortLevelEMA,
       bpm,
+      centroid,
+      percuss: this.percussEMA,
+      bassToTreble: Math.max(0.1, Math.min(10, btr)),
     };
   }
 }
