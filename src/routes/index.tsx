@@ -6,6 +6,7 @@ import { ControlsDock, TopBadge } from "@/components/visualizer/ControlsDock";
 import { MediaTray } from "@/components/visualizer/MediaTray";
 import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
 import { audioEngine } from "@/lib/audio/AudioEngine";
+import { CameraSource } from "@/components/visualizer/media/CameraSource";
 import type { PresetId } from "@/components/visualizer/presets/types";
 
 export const Route = createFileRoute("/")({
@@ -47,6 +48,7 @@ function Index() {
   useEffect(() => {
     return () => {
       audioEngine.stop();
+      CameraSource.stop();
     };
   }, []);
 
@@ -80,6 +82,7 @@ function Index() {
         }}
         onExit={() => {
           audioEngine.stop();
+          CameraSource.stop();
           setStarted(false);
         }}
         visible={uiVisible}

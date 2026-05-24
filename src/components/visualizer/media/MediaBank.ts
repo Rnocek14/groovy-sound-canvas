@@ -28,10 +28,13 @@ type Entry = {
   kind: "image" | "video";
   archetypes: ArchetypeId[];
   mood: string;
-  source: "builtin" | "user" | "ai";
+  source: "builtin" | "user" | "ai" | "camera";
   videoEl?: HTMLVideoElement;
   imageEl?: HTMLImageElement;
+  mirrored?: boolean;
 };
+
+const CAMERA_ID = "live-camera";
 
 class MediaBankImpl {
   private entries = new Map<string, Entry>();
@@ -153,10 +156,35 @@ class MediaBankImpl {
     return id;
   }
 
-  /** Pick a texture, preferring one tagged for the archetype. Falls back to any, then placeholder. */
+  /** Attach the live camera as a high-priority pickable source. */
+  attachCamera(texture: THREE.Texture, videoEl: HTMLVideoElement, mirrored = false) {
+    const existing = this.entries.get(CAMERA_ID);
+    if (existing) existing.texture.dispose();
+    this.entries.set(CAMERA_ID, {
+      id: CAMERA_ID, texture, kind: "video",
+      archetypes: ["techno","house","ambient","dnb","hiphop","rock","classical","pop"],
+      mood: "live", source: "camera", videoEl, mirrored,
+    });
+    this.emit();
+  }
+  detachCamera() {
+    const e = this.entries.get(CAMERA_ID);
+    if (e) { e.texture.dispose(); this.entries.delete(CAMERA_ID); this.emit(); }
+  }
+  getCamera(): THREE.Texture | null {
+    return this.entries.get(CAMERA_ID)?.texture ?? null;
+  }
+  isCameraMirrored(): boolean {
+    return !!this.entries.get(CAMERA_ID)?.mirrored;
+  }
+  hasCamera(): boolean { return this.entries.has(CAMERA_ID); }
+
+  /** Pick a texture, preferring camera (60%) then archetype-tagged, then any. */
   pick(archetype?: ArchetypeId, excludeId?: string): THREE.Texture {
     const all = [...this.entries.values()].filter((e) => e.id !== excludeId);
     if (all.length === 0) return this.getFallback();
+    const cam = all.find((e) => e.source === "camera");
+    if (cam && Math.random() < 0.6) return cam.texture;
     const preferred = archetype ? all.filter((e) => e.archetypes.includes(archetype)) : [];
     const pool = preferred.length ? preferred : all;
     return pool[Math.floor(Math.random() * pool.length)].texture;
@@ -165,11 +193,14 @@ class MediaBankImpl {
   pickMultiple(count: number, archetype?: ArchetypeId): THREE.Texture[] {
     const all = [...this.entries.values()];
     if (all.length === 0) return new Array(count).fill(this.getFallback());
+    const cam = all.find((e) => e.source === "camera");
     const preferred = archetype ? all.filter((e) => e.archetypes.includes(archetype)) : [];
     const pool = preferred.length >= count ? preferred : all;
     const out: THREE.Texture[] = [];
     for (let i = 0; i < count; i++) {
-      out.push(pool[Math.floor(Math.random() * pool.length)].texture);
+      // Sprinkle camera into ~40% of tiles when present
+      if (cam && Math.random() < 0.4) out.push(cam.texture);
+      else out.push(pool[Math.floor(Math.random() * pool.length)].texture);
     }
     return out;
   }
