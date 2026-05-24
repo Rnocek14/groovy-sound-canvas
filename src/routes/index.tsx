@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { PermissionGate } from "@/components/visualizer/PermissionGate";
 import { VisualizerStage } from "@/components/visualizer/VisualizerStage";
 import { ControlsDock, TopBadge } from "@/components/visualizer/ControlsDock";
+import { MediaTray } from "@/components/visualizer/MediaTray";
 import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import type { PresetId } from "@/components/visualizer/presets/types";
@@ -60,6 +61,7 @@ function Index() {
       <VideoBackdrop enabled={videoOn} />
       <VisualizerStage preset={preset} />
       <TopBadge preset={preset} visible={uiVisible} />
+      <MediaTray visible={uiVisible} />
       <ControlsDock
         preset={preset}
         setPreset={(p) => {

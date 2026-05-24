@@ -12,6 +12,9 @@ import { createWormhole } from "../modules/Wormhole";
 import { createFluidShader } from "../modules/FluidShader";
 import { createMetaBalls } from "../modules/MetaBalls";
 import { createTypeBurst } from "../modules/TypeBurst";
+import { createMediaKaleido } from "../modules/media/MediaKaleido";
+import { createSlitScan } from "../modules/media/SlitScan";
+import { createCollageStrobe } from "../modules/media/CollageStrobe";
 import type { CameraBehavior } from "./CameraDirector";
 import type { PresetId } from "../presets/types";
 
@@ -35,6 +38,7 @@ const ALL: ModuleFactory[] = [
   createTunnelRings, createWormhole, createNeonGrid, createStarfield,
   createParticleSwarm, createRingBurst, createBouncingGeo, createRibbonField,
   createPlexus, createSupershape, createFluidShader, createMetaBalls, createTypeBurst,
+  createMediaKaleido, createSlitScan, createCollageStrobe,
 ];
 
 export const POOLS: Record<PresetId, PresetPool> = {
