@@ -7,7 +7,9 @@ export type EventName =
   | "kaleido-flip"
   | "snap-zoom"
   | "flash"
-  | "invert";
+  | "invert"
+  | "ai-direction"
+  | "type-burst";
 
 type Handler = (data?: unknown) => void;
 
