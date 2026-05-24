@@ -53,8 +53,8 @@ export class AudioEngine {
     this.ctx = ctx;
     this.source = source;
     this.analyser = analyser;
-    this.fft = new Uint8Array(analyser.frequencyBinCount);
-    this.time = new Uint8Array(analyser.fftSize);
+    this.fft = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+    this.time = new Uint8Array(new ArrayBuffer(analyser.fftSize));
   }
 
   stop() {
