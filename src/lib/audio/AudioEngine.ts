@@ -47,6 +47,12 @@ export class AudioEngine {
   // Spectral flux
   private prevFFT: Float32Array | null = null;
 
+  // Phase tracking
+  private shortLevelEMA = 0;
+  private beatTimes: number[] = [];
+  private phase: SongPhase = "intro";
+  private startedAt = 0;
+
   sensitivity = 1;
 
   async start(streamIn?: MediaStream) {
@@ -92,17 +98,13 @@ export class AudioEngine {
       return {
         fft: new Uint8Array(0),
         time: new Uint8Array(0),
-        bass: 0,
-        mid: 0,
-        treble: 0,
-        level: 0,
-        beat: false,
-        sinceBeat: 999,
-        drop: false,
-        energy: 0,
-        flux: 0,
+        bass: 0, mid: 0, treble: 0, level: 0,
+        beat: false, sinceBeat: 999, drop: false,
+        energy: 0, flux: 0,
+        phase: "intro", shortEnergy: 0, bpm: 0,
       };
     }
+    if (!this.startedAt) this.startedAt = now;
     a.getByteFrequencyData(this.fft);
     a.getByteTimeDomainData(this.time);
 
