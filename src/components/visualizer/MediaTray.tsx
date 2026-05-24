@@ -18,15 +18,18 @@ export function MediaTray({ visible }: { visible: boolean }) {
     const off = CameraSource.onChange(() => {
       setCamStatus(CameraSource.status);
       setCamFacing(CameraSource.currentFacing);
-      // wire the live video element into the thumbnail
-      const v = CameraSource.getVideo();
-      if (thumbRef.current && v) {
-        thumbRef.current.srcObject = v.srcObject;
-        thumbRef.current.play().catch(() => {});
-      }
     });
-    return () => { off; };
+    return () => { off(); };
   }, []);
+  // Wire thumbnail every time the camera turns on (video element mounts)
+  useEffect(() => {
+    if (camStatus !== "live") return;
+    const src = CameraSource.getVideo();
+    if (thumbRef.current && src?.srcObject) {
+      thumbRef.current.srcObject = src.srcObject;
+      thumbRef.current.play().catch(() => {});
+    }
+  }, [camStatus, camFacing]);
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
