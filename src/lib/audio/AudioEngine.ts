@@ -1,3 +1,5 @@
+export type SongPhase = "intro" | "build" | "drop" | "groove" | "breakdown";
+
 export type AudioFrame = {
   fft: Uint8Array<ArrayBuffer>;
   time: Uint8Array<ArrayBuffer>;
@@ -10,6 +12,9 @@ export type AudioFrame = {
   drop: boolean;       // big energy spike, advances scenes
   energy: number;      // long-window level EMA
   flux: number;        // spectral flux 0..1
+  phase: SongPhase;    // local song structure estimate
+  shortEnergy: number; // ~3s window
+  bpm: number;         // rough beat tempo estimate
 };
 
 export class AudioEngine {
