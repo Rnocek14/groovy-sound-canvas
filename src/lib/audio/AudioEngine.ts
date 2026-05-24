@@ -31,16 +31,18 @@ export class AudioEngine {
 
   sensitivity = 1;
 
-  async start() {
+  async start(streamIn?: MediaStream) {
     if (this.ctx) return;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      },
-      video: false,
-    });
+    const stream =
+      streamIn ??
+      (await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+        video: false,
+      }));
     this.stream = stream;
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();

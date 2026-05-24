@@ -1,20 +1,65 @@
 import { useState } from "react";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 
+const inIframe = () => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+};
+
 export function PermissionGate({ onReady }: { onReady: () => void }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const start = async () => {
+  // Synchronous click handler — getUserMedia called immediately within gesture.
+  const start = (e: React.MouseEvent | React.PointerEvent) => {
+    e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setErr(null);
-    try {
-      await audioEngine.start();
-      onReady();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Mic access denied");
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErr("This browser doesn't expose microphone access. Try Safari or Chrome.");
       setBusy(false);
+      return;
     }
+
+    // Call getUserMedia SYNCHRONOUSLY in the gesture handler — no awaits before it.
+    const p = navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+      video: false,
+    });
+
+    p.then(async (stream) => {
+      try {
+        await audioEngine.start(stream);
+        onReady();
+      } catch (err2) {
+        setErr(err2 instanceof Error ? err2.message : "Audio setup failed");
+        setBusy(false);
+      }
+    }).catch((err2: DOMException) => {
+      let msg = err2.message || "Microphone blocked";
+      if (err2.name === "NotAllowedError") {
+        msg = inIframe()
+          ? "Mic blocked by the preview frame. Tap the ⤴ button (top right) to open in a new tab, then try again."
+          : "Microphone permission denied. Enable it in your browser settings.";
+      } else if (err2.name === "NotFoundError") {
+        msg = "No microphone found on this device.";
+      } else if (err2.name === "NotReadableError") {
+        msg = "Mic is in use by another app. Close it and try again.";
+      } else if (err2.name === "SecurityError") {
+        msg = "Mic requires HTTPS or the published URL.";
+      }
+      setErr(msg);
+      setBusy(false);
+    });
   };
 
   return (
@@ -37,19 +82,19 @@ export function PermissionGate({ onReady }: { onReady: () => void }) {
           </p>
         </div>
         <button
+          type="button"
           onClick={start}
           disabled={busy}
           className="group relative rounded-full border-2 border-white bg-white px-10 py-5 text-sm font-black tracking-[0.3em] text-black transition-transform active:scale-95 disabled:opacity-60"
         >
           {busy ? "LISTENING…" : "TAP TO START"}
-          <span className="pointer-events-none absolute -inset-2 rounded-full border border-white/50 opacity-0 group-active:opacity-100" />
         </button>
         <p className="max-w-xs text-balance text-xs leading-relaxed text-white/60">
-          Allow microphone access and play music near your phone. Best with headphones off and
-          phone speaker pointed at the source.
+          Allow microphone access and play music near your phone. If you're in the Lovable
+          preview, open in a new tab for mic access.
         </p>
         {err && (
-          <p className="rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <p className="max-w-xs rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
             {err}
           </p>
         )}
