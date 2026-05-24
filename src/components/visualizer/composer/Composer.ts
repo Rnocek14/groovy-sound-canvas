@@ -331,7 +331,10 @@ export class Composer {
     this.palette.update(dt);
     this.cam.update(t, dt, f);
 
-    // smooth module intensities
+    // smooth module intensities; camera-echo is pinned on while camera is live
+    const camLive = MediaBank.hasCamera();
+    if (camLive) this.active_target.set("camera-echo", 1);
+    else if ((this.active_target.get("camera-echo") ?? 0) > 0) this.active_target.set("camera-echo", 0);
     const k = 1 - Math.pow(0.001, dt * 2);
     for (const m of this.all) {
       const cur = this.active_intensity.get(m.id) ?? 0;
