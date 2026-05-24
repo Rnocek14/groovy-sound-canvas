@@ -93,6 +93,45 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       }
     };
 
+    const callArchetype = async (now: number) => {
+      if (archInFlight || !composer) return;
+      archInFlight = true;
+      try {
+        const r = await fetchArchetype({ data: {
+          bpm: lastFrame.bpm,
+          energy: +lastFrame.energy.toFixed(3),
+          centroid: +lastFrame.centroid.toFixed(3),
+          bassToTreble: +lastFrame.bassToTreble.toFixed(3),
+          percuss: +lastFrame.percuss.toFixed(3),
+          flux: +lastFrame.flux.toFixed(3),
+          level: +lastFrame.level.toFixed(3),
+        } });
+        if (r && (r.archetype as ArchetypeId) in ARCHETYPES) {
+          composer?.setArchetypeId(r.archetype as ArchetypeId);
+          // queue media generation tied to this archetype + AI prompt
+          if (
+            !mediaGenInFlight &&
+            now - lastMediaGenAt > 60 &&
+            lastMediaGenArch !== r.archetype
+          ) {
+            mediaGenInFlight = true;
+            lastMediaGenAt = now;
+            lastMediaGenArch = r.archetype as ArchetypeId;
+            try {
+              const prompt = r.mediaPrompt || ARCHETYPES[r.archetype as ArchetypeId].mediaPrompt;
+              const m = await fetchMedia({ data: { prompt } });
+              if (m?.dataUrl) await MediaBank.addAIGenerated(m.dataUrl, r.archetype as ArchetypeId);
+            } catch (e) { console.debug("[media-gen]", e); }
+            finally { mediaGenInFlight = false; }
+          }
+        }
+      } catch (e) {
+        console.debug("[arch-AI]", e);
+      } finally {
+        archInFlight = false;
+      }
+    };
+
     const tick = () => {
       const now = performance.now() / 1000;
       const dt = Math.min(0.05, now - last);
@@ -103,12 +142,19 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       if (presetRef.current !== active) mount(presetRef.current);
       composer?.render(now, dt, lastFrame);
 
-      // AI director cadence: first call ~4s in, then every 22s; faster on drops if it's been >12s
+      // VJ direction cadence (palette + post tweaks): first ~4s, then every 22s; faster on drops
       const interval = lastFrame.drop && now - lastAICall > 12 ? 0 : 22;
       const dueFirst = lastAICall < 0 && now - startedAt > 4 && lastFrame.energy > 0.02;
       if ((dueFirst || (lastAICall > 0 && now - lastAICall > interval)) && audioEngine.analyser) {
         lastAICall = now;
         callAI(now);
+      }
+
+      // Archetype classifier cadence: first ~8s, then every 30s
+      const archDueFirst = lastArchCall < 0 && now - startedAt > 8 && lastFrame.energy > 0.03;
+      if ((archDueFirst || (lastArchCall > 0 && now - lastArchCall > 30)) && audioEngine.analyser) {
+        lastArchCall = now;
+        callArchetype(now);
       }
 
       raf = requestAnimationFrame(tick);
