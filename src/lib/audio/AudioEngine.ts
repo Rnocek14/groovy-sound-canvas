@@ -205,6 +205,22 @@ export class AudioEngine {
     }
     const flux = Math.min(1, fluxSum / Math.max(1, this.fft.length * 0.05));
 
+    // Spectral centroid (brightness): weighted mean bin / nyquist
+    let csum = 0, cw = 0;
+    for (let i = 1; i < this.fft.length; i++) {
+      const v = this.fft[i] / 255;
+      csum += v * i;
+      cw += v;
+    }
+    const centroid = cw > 0 ? Math.min(1, (csum / cw) / this.fft.length * 2.2) : 0;
+
+    // Percussiveness = recent transient density (smoothed)
+    const transient = Math.max(0, this.levelEMA - this.shortLevelEMA);
+    this.percussEMA = this.percussEMA * 0.92 + Math.min(1, transient * 5) * 0.08;
+
+    // Bass-to-treble ratio (clamped)
+    const btr = (this.bassEMA + 0.02) / (this.trebleEMA + 0.02);
+
     // BPM from beat intervals (median of last N gaps)
     let bpm = 0;
     if (this.beatTimes.length >= 4) {
@@ -237,6 +253,9 @@ export class AudioEngine {
       phase: this.phase,
       shortEnergy: this.shortLevelEMA,
       bpm,
+      centroid,
+      percuss: this.percussEMA,
+      bassToTreble: Math.max(0.1, Math.min(10, btr)),
     };
   }
 }
