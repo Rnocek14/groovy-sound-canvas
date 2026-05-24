@@ -123,15 +123,12 @@ export const createCameraEcho: ModuleFactory = ({ scene, palette }): VModule => 
       const camTex = MediaBank.getCamera();
       if (camTex) {
         mat.uniforms.uTex.value = camTex;
+        mat.uniforms.uMirror.value = MediaBank.isCameraMirrored() ? 1.0 : 0.0;
         const v = (camTex as THREE.VideoTexture).image as HTMLVideoElement | undefined;
         if (v && v.videoWidth > 0) {
-          // Fill canvas aspect: camera is typically landscape, viewport often portrait
           const camAspect = v.videoWidth / v.videoHeight;
           const canvasAspect = window.innerWidth / Math.max(1, window.innerHeight);
           mat.uniforms.uAspect.value = camAspect / canvasAspect;
-          // Mirror flag from MediaBank entry
-          const entry = MediaBank.list().find((e) => e.id === "live-camera");
-          void entry;
         }
       }
       mesh.visible = intensity > 0.01 && MediaBank.hasCamera();
@@ -158,10 +155,6 @@ export const createCameraEcho: ModuleFactory = ({ scene, palette }): VModule => 
       mat.uniforms.uC0.value.copy(palette.get(0));
       mat.uniforms.uC1.value.copy(palette.get(2));
       mat.uniforms.uC2.value.copy(palette.get(1));
-
-      // Mirror from MediaBank entry
-      const list = MediaBank.list();
-      void list;
     },
     dispose() {
       scene.remove(mesh);

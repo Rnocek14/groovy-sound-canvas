@@ -174,6 +174,9 @@ class MediaBankImpl {
   getCamera(): THREE.Texture | null {
     return this.entries.get(CAMERA_ID)?.texture ?? null;
   }
+  isCameraMirrored(): boolean {
+    return !!this.entries.get(CAMERA_ID)?.mirrored;
+  }
   hasCamera(): boolean { return this.entries.has(CAMERA_ID); }
 
   /** Pick a texture, preferring camera (60%) then archetype-tagged, then any. */
