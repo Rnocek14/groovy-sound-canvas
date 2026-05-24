@@ -259,9 +259,45 @@ export class Composer {
     void this.active;
   }
 
+  /**
+   * Apply an archetype: bias module weights, post-FX, palette, camera bank, bg color.
+   * Called automatically when the local classifier switches or when AI overrides.
+   */
+  private applyArchetype(a: ArchetypeDef) {
+    this.currentArchetype = a;
+    // post-FX targets blend toward archetype values (ease in render)
+    if (a.post.kaleido !== undefined) this.kaleidoT = a.post.kaleido;
+    if (a.post.warp !== undefined) this.warpT = a.post.warp;
+    if (a.post.chroma !== undefined) this.chromaT = a.post.chroma;
+    if (a.post.scanlines !== undefined) this.scanlinesT = a.post.scanlines;
+    if (a.post.glitch !== undefined) this.glitchT = a.post.glitch;
+    if (a.post.feedback !== undefined) this.feedbackT = a.post.feedback;
+    // palette family
+    if (a.paletteHints.length) {
+      const idx = a.paletteHints[Math.floor(Math.random() * a.paletteHints.length)];
+      this.palette.flipTo(idx);
+    }
+    // module weights
+    this.hintWeights.clear();
+    for (const [id, w] of Object.entries(a.moduleWeights)) this.hintWeights.set(id, w);
+    // camera bank
+    if (a.cameras.length) this.cam.pick(a.cameras[Math.floor(Math.random() * a.cameras.length)]);
+    // bg
+    this.renderer.setClearColor(a.bg, 1);
+    if (this.scene.fog instanceof THREE.Fog) this.scene.fog.color.setHex(a.bg);
+    // flash to mark transition + remix on next bar
+    this.flash = Math.max(this.flash, 0.8);
+    this.remix(false);
+  }
+
+  /** Allow external code (e.g. AI server fn) to force an archetype. */
+  setArchetypeId(id: ArchetypeId) { this.arch.setAIArchetype(id); }
+  get archetypeId(): ArchetypeId { return this.currentArchetype.id; }
+
   skip() { this.events.emit("skip"); }
 
   applyDirection(d: AIDirection) { this.events.emit("ai-direction", d); }
+
 
   resize(w: number, h: number, dpr: number) {
     this.renderer.setPixelRatio(dpr);
@@ -280,6 +316,7 @@ export class Composer {
   }
 
   render(t: number, dt: number, f: AudioFrame) {
+    this.arch.update(t, dt, f);
     this.director.update(t, f);
     this.palette.update(dt);
     this.cam.update(t, dt, f);
