@@ -106,6 +106,7 @@ class CameraSourceImpl {
     if (this.video) {
       this.video.pause();
       this.video.srcObject = null;
+      if (this.video.parentNode) this.video.parentNode.removeChild(this.video);
       this.video = null;
     }
     if (this.texture) {
