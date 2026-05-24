@@ -49,6 +49,7 @@ export class AudioEngine {
 
   // Spectral flux
   private prevFFT: Float32Array | null = null;
+  private percussEMA = 0;
 
   // Phase tracking
   private shortLevelEMA = 0;
