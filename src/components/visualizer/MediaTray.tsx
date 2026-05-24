@@ -5,7 +5,10 @@ export function MediaTray({ visible }: { visible: boolean }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(MediaBank.list());
   const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => MediaBank.onChange(() => setItems(MediaBank.list())), []);
+  useEffect(() => {
+    const off = MediaBank.onChange(() => setItems(MediaBank.list()));
+    return () => { off; };
+  }, []);
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
