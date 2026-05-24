@@ -4,6 +4,10 @@ import type { PresetId } from "./presets/types";
 import { Composer } from "./composer/Composer";
 import { useServerFn } from "@tanstack/react-start";
 import { getVJDirection } from "@/lib/visualizer-ai.functions";
+import { getArchetype } from "@/lib/visualizer-archetype.functions";
+import { generateMedia } from "@/lib/visualizer-mediagen.functions";
+import { MediaBank } from "./media/MediaBank";
+import { ARCHETYPES, type ArchetypeId } from "./composer/archetypes";
 
 export function VisualizerStage({ preset }: { preset: PresetId }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -11,6 +15,8 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
   presetRef.current = preset;
   const composerRef = useRef<Composer | null>(null);
   const fetchDirection = useServerFn(getVJDirection);
+  const fetchArchetype = useServerFn(getArchetype);
+  const fetchMedia = useServerFn(generateMedia);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -30,6 +36,11 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
     let dropsInWindow: number[] = [];
     let lastAICall = -10;
     let aiInFlight = false;
+    let lastArchCall = -10;
+    let archInFlight = false;
+    let lastMediaGenArch: ArchetypeId | null = null;
+    let lastMediaGenAt = -1000;
+    let mediaGenInFlight = false;
     let startedAt = performance.now() / 1000;
 
     const mount = (id: PresetId) => {
