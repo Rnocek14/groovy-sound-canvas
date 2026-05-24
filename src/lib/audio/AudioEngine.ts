@@ -1,6 +1,6 @@
 export type AudioFrame = {
-  fft: Uint8Array;
-  time: Uint8Array;
+  fft: Uint8Array<ArrayBuffer>;
+  time: Uint8Array<ArrayBuffer>;
   bass: number; // 0..1
   mid: number;
   treble: number;
