@@ -174,7 +174,7 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       composer?.dispose();
       canvas?.remove();
     };
-  }, [fetchDirection]);
+  }, [fetchDirection, fetchArchetype, fetchMedia]);
 
   return <div ref={wrapRef} className="absolute inset-0 overflow-hidden" />;
 }
