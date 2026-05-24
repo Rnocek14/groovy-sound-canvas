@@ -1,12 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import { MediaBank } from "./media/MediaBank";
+import { CameraSource } from "./media/CameraSource";
 
 export function MediaTray({ visible }: { visible: boolean }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(MediaBank.list());
+  const [camStatus, setCamStatus] = useState(CameraSource.status);
+  const [camFacing, setCamFacing] = useState(CameraSource.currentFacing);
   const inputRef = useRef<HTMLInputElement>(null);
+  const thumbRef = useRef<HTMLVideoElement>(null);
+
   useEffect(() => {
     const off = MediaBank.onChange(() => setItems(MediaBank.list()));
+    return () => { off; };
+  }, []);
+  useEffect(() => {
+    const off = CameraSource.onChange(() => {
+      setCamStatus(CameraSource.status);
+      setCamFacing(CameraSource.currentFacing);
+      // wire the live video element into the thumbnail
+      const v = CameraSource.getVideo();
+      if (thumbRef.current && v) {
+        thumbRef.current.srcObject = v.srcObject;
+        thumbRef.current.play().catch(() => {});
+      }
+    });
     return () => { off; };
   }, []);
 
@@ -17,6 +35,7 @@ export function MediaTray({ visible }: { visible: boolean }) {
 
   const userCount = items.filter((i) => i.source === "user").length;
   const aiCount = items.filter((i) => i.source === "ai").length;
+  const camOn = camStatus === "live";
 
   return (
     <div
@@ -28,10 +47,64 @@ export function MediaTray({ visible }: { visible: boolean }) {
         onClick={() => setOpen((v) => !v)}
         className="pointer-events-auto rounded-full border border-white/40 bg-black/50 px-3 py-1 text-[10px] font-bold tracking-widest text-white/80 backdrop-blur-md"
       >
-        MEDIA · {items.length} ({userCount}U / {aiCount}AI)
+        MEDIA · {items.length} ({userCount}U / {aiCount}AI{camOn ? " / CAM" : ""})
       </button>
       {open && (
-        <div className="pointer-events-auto flex max-h-[60vh] w-64 flex-col gap-2 overflow-y-auto rounded-2xl border border-white/20 bg-black/70 p-3 backdrop-blur-md">
+        <div className="pointer-events-auto flex max-h-[70vh] w-64 flex-col gap-2 overflow-y-auto rounded-2xl border border-white/20 bg-black/70 p-3 backdrop-blur-md">
+          {/* CAMERA SECTION */}
+          <div className="flex flex-col gap-2 rounded-xl border border-white/15 bg-white/5 p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold tracking-widest text-white/80">LIVE CAMERA</span>
+              <span className={`text-[9px] tracking-wider ${
+                camOn ? "text-emerald-400" : camStatus === "denied" ? "text-rose-400" : "text-white/40"
+              }`}>
+                {camOn ? "● LIVE" : camStatus === "denied" ? "DENIED" : camStatus === "starting" ? "…" : "OFF"}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => camOn ? CameraSource.stop() : CameraSource.start(camFacing)}
+                className={`flex-1 rounded-full border px-3 py-2 text-[10px] font-bold tracking-widest transition-colors ${
+                  camOn ? "border-emerald-400 bg-emerald-400/20 text-emerald-200" : "border-white/40 bg-white/10 text-white"
+                }`}
+              >
+                {camOn ? "STOP" : camStatus === "denied" ? "RETRY" : "USE CAMERA"}
+              </button>
+              {camOn && (
+                <button
+                  onClick={() => CameraSource.flip()}
+                  className="rounded-full border border-white/40 bg-white/10 px-3 py-2 text-[10px] font-bold tracking-widest text-white"
+                  title="Flip front/back"
+                >
+                  ⇄ {camFacing === "user" ? "FRONT" : "BACK"}
+                </button>
+              )}
+            </div>
+            {camOn && (
+              <div className="relative aspect-video overflow-hidden rounded border border-emerald-400/40 bg-black">
+                <video
+                  ref={thumbRef}
+                  muted
+                  playsInline
+                  autoPlay
+                  className={`h-full w-full object-cover ${camFacing === "user" ? "scale-x-[-1]" : ""}`}
+                />
+                <div className="absolute left-1 top-1 rounded-sm bg-black/60 px-1 text-[8px] font-bold tracking-wider text-emerald-300">
+                  ● LIVE
+                </div>
+              </div>
+            )}
+            {camStatus === "denied" && (
+              <p className="text-[9px] tracking-wider text-rose-300/80">
+                Permission denied. Enable camera in browser settings.
+              </p>
+            )}
+            <p className="text-[9px] tracking-wider text-white/40">
+              Stays on your device — never uploaded.
+            </p>
+          </div>
+
+          {/* UPLOAD SECTION */}
           <button
             onClick={() => inputRef.current?.click()}
             className="rounded-full border border-white/40 bg-white/10 px-3 py-2 text-[10px] font-bold tracking-widest text-white"
@@ -51,7 +124,10 @@ export function MediaTray({ visible }: { visible: boolean }) {
               <div
                 key={it.id}
                 className={`relative aspect-square overflow-hidden rounded border ${
-                  it.source === "user" ? "border-emerald-400/60" : it.source === "ai" ? "border-violet-400/60" : "border-white/20"
+                  it.source === "user" ? "border-emerald-400/60"
+                    : it.source === "ai" ? "border-violet-400/60"
+                    : it.source === "camera" ? "border-amber-400/80"
+                    : "border-white/20"
                 } bg-black/40`}
               >
                 <div className="absolute inset-0 flex items-center justify-center text-[8px] tracking-wider text-white/60">
@@ -69,7 +145,7 @@ export function MediaTray({ visible }: { visible: boolean }) {
             ))}
           </div>
           <p className="text-[9px] tracking-wider text-white/40">
-            Uploads persist in this browser. Tap × to remove.
+            Uploads persist in this browser.
           </p>
         </div>
       )}
