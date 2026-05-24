@@ -14,8 +14,8 @@ export class AudioEngine {
   analyser: AnalyserNode | null = null;
   stream: MediaStream | null = null;
   source: MediaStreamAudioSourceNode | null = null;
-  fft!: Uint8Array;
-  time!: Uint8Array;
+  fft!: Uint8Array<ArrayBuffer>;
+  time!: Uint8Array<ArrayBuffer>;
 
   // EMAs
   private bassEMA = 0;
