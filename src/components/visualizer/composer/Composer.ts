@@ -226,25 +226,28 @@ export class Composer {
   }
 
   private remix(initial: boolean) {
-    // weighted pick honoring AI hints; boost camera-echo strongly when camera is live
+    // Camera (when live) is a persistent background layer — not subject to remix.
     const camLive = MediaBank.hasCamera();
-    const weighted = this.all.map((m) => {
-      const base = this.hintWeights.get(m.id) ?? 1;
-      const camBoost = camLive && m.id === "camera-echo" ? 5 : 1;
-      return { m, w: base * camBoost * (0.5 + Math.random()) };
-    });
+    const weighted = this.all
+      .filter((m) => m.id !== "camera-echo")
+      .map((m) => {
+        const base = this.hintWeights.get(m.id) ?? 1;
+        return { m, w: base * (0.5 + Math.random()) };
+      });
     weighted.sort((a, b) => b.w - a.w);
     const target = this.pool.activeCount;
     const pick: VModule[] = [];
     const layers = new Set<string>();
     for (const { m } of weighted) {
       if (pick.length >= target) break;
+      // When camera is live it owns the bg layer — allow other bg modules to be skipped more
       if (layers.has(m.layer) && Math.random() < 0.35) continue;
+      if (camLive && m.layer === "bg" && Math.random() < 0.6) continue;
       pick.push(m);
       layers.add(m.layer);
     }
-    if (!pick.some((m) => m.layer === "bg")) {
-      const bg = this.all.find((m) => m.layer === "bg");
+    if (!camLive && !pick.some((m) => m.layer === "bg")) {
+      const bg = this.all.find((m) => m.layer === "bg" && m.id !== "camera-echo");
       if (bg && !pick.includes(bg)) {
         pick.pop();
         pick.push(bg);
@@ -254,6 +257,8 @@ export class Composer {
     const activeIds = new Set(pick.map((m) => m.id));
     this.active_target.clear();
     for (const m of this.all) this.active_target.set(m.id, activeIds.has(m.id) ? 1 : 0);
+    // Pin camera-echo on whenever camera stream is live
+    if (camLive) this.active_target.set("camera-echo", 1);
 
     this.cam.pick();
     if (!initial) {
@@ -326,7 +331,10 @@ export class Composer {
     this.palette.update(dt);
     this.cam.update(t, dt, f);
 
-    // smooth module intensities
+    // smooth module intensities; camera-echo is pinned on while camera is live
+    const camLive = MediaBank.hasCamera();
+    if (camLive) this.active_target.set("camera-echo", 1);
+    else if ((this.active_target.get("camera-echo") ?? 0) > 0) this.active_target.set("camera-echo", 0);
     const k = 1 - Math.pow(0.001, dt * 2);
     for (const m of this.all) {
       const cur = this.active_intensity.get(m.id) ?? 0;
