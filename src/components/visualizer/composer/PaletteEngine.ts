@@ -17,7 +17,7 @@ export class PaletteEngine {
   private b: THREE.Color[] = [];
   private cur: THREE.Color[] = [];
   private mix = 1;
-  private rotation = 0; // hue offset 0..1
+  private rotation = 0;
   constructor(initialIndex = 0) {
     this.a = PALETTES[initialIndex].map((h) => new THREE.Color(h));
     this.b = this.a.map((c) => c.clone());
@@ -26,6 +26,14 @@ export class PaletteEngine {
   flipTo(index?: number) {
     const i = index ?? Math.floor(Math.random() * PALETTES.length);
     this.b = PALETTES[i].map((h) => new THREE.Color(h));
+    this.mix = 0;
+  }
+  setCustom(hex: string[]) {
+    const safe = hex.slice(0, 4).map((s) => {
+      try { return new THREE.Color(s); } catch { return new THREE.Color(0xffffff); }
+    });
+    while (safe.length < 4) safe.push(safe[safe.length - 1] || new THREE.Color(0xffffff));
+    this.b = safe;
     this.mix = 0;
   }
   rotateHue(deg: number) {
