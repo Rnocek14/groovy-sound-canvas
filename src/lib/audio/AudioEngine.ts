@@ -15,6 +15,9 @@ export type AudioFrame = {
   phase: SongPhase;    // local song structure estimate
   shortEnergy: number; // ~3s window
   bpm: number;         // rough beat tempo estimate
+  centroid: number;    // 0..1 spectral centroid (brightness)
+  percuss: number;     // 0..1 percussiveness (transient density)
+  bassToTreble: number;// >1 = bass heavy, <1 = treble heavy
 };
 
 export class AudioEngine {
