@@ -48,6 +48,7 @@ function Index() {
   useEffect(() => {
     return () => {
       audioEngine.stop();
+      CameraSource.stop();
     };
   }, []);
 
@@ -81,6 +82,7 @@ function Index() {
         }}
         onExit={() => {
           audioEngine.stop();
+          CameraSource.stop();
           setStarted(false);
         }}
         visible={uiVisible}
