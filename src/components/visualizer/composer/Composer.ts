@@ -4,7 +4,10 @@ import { EventBus } from "./EventBus";
 import { PaletteEngine } from "./PaletteEngine";
 import { CameraDirector, type CameraBehavior } from "./CameraDirector";
 import { RemixDirector } from "./RemixDirector";
+import { ArchetypeDirector } from "./ArchetypeDirector";
+import { ARCHETYPES, type ArchetypeDef, type ArchetypeId } from "./archetypes";
 import { POOLS } from "./presetPools";
+import { MediaBank } from "../media/MediaBank";
 import type { PresetId } from "../presets/types";
 import type { VModule } from "../modules/types";
 import type { AIDirection } from "@/lib/visualizer-ai.functions";
@@ -26,6 +29,8 @@ export class Composer {
   private palette: PaletteEngine;
   private cam: CameraDirector;
   private director: RemixDirector;
+  private arch: ArchetypeDirector;
+  private currentArchetype: ArchetypeDef = ARCHETYPES.house;
 
   private all: VModule[] = [];
   private active: VModule[] = [];
@@ -60,7 +65,13 @@ export class Composer {
     this.palette = new PaletteEngine(this.pool.initialPalette);
     this.cam = new CameraDirector(this.camera, this.pool.cameraBias);
     this.cam.pick();
-    this.director = new RemixDirector({ events: this.events });
+    // RemixDirector handles micro/meso punctuation; ArchetypeDirector owns macros (bar-locked)
+    this.director = new RemixDirector({ events: this.events, macroMin: 40, macroMax: 80 });
+    this.arch = new ArchetypeDirector(this.events);
+    this.arch.onArchetypeChange((a) => this.applyArchetype(a));
+
+    // Load media bank assets (built-in + restore user uploads)
+    MediaBank.init().catch(() => {});
 
     for (const f of this.pool.factories) {
       const m = f({ scene: this.scene, palette: this.palette, events: this.events });
