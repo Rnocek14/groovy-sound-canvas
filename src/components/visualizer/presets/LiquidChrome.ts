@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { PresetFactory } from "./types";
+import { SceneDirector } from "./SceneDirector";
 
-// Reusable simplex noise GLSL chunk
 const SNOISE = `
   vec3 mod289(vec3 x){return x - floor(x*(1.0/289.0))*289.0;}
   vec4 mod289v4(vec4 x){return x - floor(x*(1.0/289.0))*289.0;}
@@ -55,26 +55,29 @@ export const createLiquidChrome: PresetFactory = ({ canvas, getFrame }) => {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setClearColor(0x000000, 1);
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
   camera.position.set(0, 0, 4.5);
 
-  // === BG: swirling iridescent gradient, always animating ===
+  const director = new SceneDirector({
+    scenes: ["bloom", "wormhole", "shatter-orbit", "liquid-rebirth"],
+    minDuration: 15, maxDuration: 25, transitionTime: 1.2, seed: 41,
+  });
+
+  // BG
   const bgGeo = new THREE.PlaneGeometry(2, 2);
   const bgMat = new THREE.ShaderMaterial({
-    depthTest: false,
-    depthWrite: false,
+    depthTest: false, depthWrite: false,
     uniforms: { uTime: { value: 0 }, uHue: { value: 0 }, uLevel: { value: 0 } },
     vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.999, 1.0); }`,
     fragmentShader: `
       uniform float uTime; uniform float uHue; uniform float uLevel;
-      uniform vec2 uRes;
       vec3 hsv2rgb(vec3 c){
         vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
         vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);
         return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
       }
       void main(){
-        vec2 uv = gl_FragCoord.xy / vec2(800.0); // arbitrary scale; visual only
+        vec2 uv = gl_FragCoord.xy / vec2(800.0);
         vec2 p = uv - 0.5;
         float a = atan(p.y, p.x);
         float r = length(p);
@@ -87,29 +90,25 @@ export const createLiquidChrome: PresetFactory = ({ canvas, getFrame }) => {
       }
     `,
   });
-  const bg = new THREE.Mesh(bgGeo, bgMat);
-  bg.frustumCulled = false;
-  scene.add(bg);
+  const bg = new THREE.Mesh(bgGeo, bgMat); bg.frustumCulled = false; scene.add(bg);
 
-  // === Morphing iridescent blob ===
+  // Blob
   const geo = new THREE.IcosahedronGeometry(1, 48);
   const blobMat = new THREE.ShaderMaterial({
+    transparent: true,
     uniforms: {
-      uTime: { value: 0 },
-      uBass: { value: 0 },
-      uTreble: { value: 0 },
-      uLevel: { value: 0 },
-      uHue: { value: 0 },
+      uTime: { value: 0 }, uBass: { value: 0 }, uTreble: { value: 0 },
+      uLevel: { value: 0 }, uHue: { value: 0 }, uExplode: { value: 0 }, uOpacity: { value: 1 },
     },
     vertexShader: `
-      uniform float uTime; uniform float uBass; uniform float uTreble;
+      uniform float uTime; uniform float uBass; uniform float uTreble; uniform float uExplode;
       varying vec3 vN; varying vec3 vP;
       ${SNOISE}
       void main(){
         float freq = 1.4 + uTreble*2.0 + sin(uTime*0.3)*0.4;
         float n = snoise(position * freq + vec3(uTime*0.5, uTime*0.3, -uTime*0.4));
         float n2 = snoise(position * 3.0 + vec3(-uTime*0.7));
-        float disp = n * (0.35 + uBass*0.7) + n2 * 0.08;
+        float disp = n * (0.35 + uBass*0.7) + n2 * 0.08 + uExplode * (0.5 + n*1.5);
         vec3 p = position + normal * disp;
         vN = normalize(normalMatrix * normal);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
@@ -119,10 +118,8 @@ export const createLiquidChrome: PresetFactory = ({ canvas, getFrame }) => {
     `,
     fragmentShader: `
       varying vec3 vN; varying vec3 vP;
-      uniform float uTime; uniform float uLevel; uniform float uHue;
-      vec3 iri(float t){
-        return 0.5 + 0.5*cos(6.2831*(vec3(0.0,0.33,0.67) + t));
-      }
+      uniform float uTime; uniform float uLevel; uniform float uHue; uniform float uOpacity;
+      vec3 iri(float t){ return 0.5 + 0.5*cos(6.2831*(vec3(0.0,0.33,0.67) + t)); }
       void main(){
         vec3 V = normalize(-vP);
         float fres = pow(1.0 - max(dot(vN, V), 0.0), 2.5);
@@ -131,31 +128,39 @@ export const createLiquidChrome: PresetFactory = ({ canvas, getFrame }) => {
         vec3 col = iri(t) * (0.5 + uLevel*0.9);
         col += iri(t + 0.3) * fres * 1.5;
         col = pow(col, vec3(0.9));
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, uOpacity);
       }
     `,
   });
   const blob = new THREE.Mesh(geo, blobMat);
   scene.add(blob);
 
-  // Ghost copies (additive, slight scale offset) for motion-trail feel
-  const ghostMatA = blobMat.clone();
-  ghostMatA.transparent = true;
-  ghostMatA.blending = THREE.AdditiveBlending;
-  ghostMatA.depthWrite = false;
-  const ghostA = new THREE.Mesh(geo, ghostMatA);
-  ghostA.scale.setScalar(1.06);
-  scene.add(ghostA);
+  // === Chrome wormhole tunnel (cylinder, viewed from inside) ===
+  const wormGeo = new THREE.CylinderGeometry(2.5, 2.5, 60, 24, 1, true);
+  const wormMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, transparent: true,
+    uniforms: { uTime: { value: 0 }, uBass: { value: 0 }, uOpacity: { value: 0 }, uHue: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `
+      varying vec2 vUv; uniform float uTime; uniform float uBass; uniform float uOpacity; uniform float uHue;
+      vec3 iri(float t){ return 0.5 + 0.5*cos(6.2831*(vec3(0.0,0.33,0.67) + t)); }
+      void main(){
+        float scroll = vUv.y * 12.0 + uTime * (1.5 + uBass*4.0);
+        float bands = sin(scroll * 6.28) * 0.5 + 0.5;
+        float fine = sin(vUv.x * 80.0 + uTime*2.0) * 0.15;
+        vec3 col = iri(uHue + vUv.y*0.6 + bands*0.2);
+        float br = bands * (0.5 + uBass*0.8) + fine;
+        gl_FragColor = vec4(col * (0.3 + br*1.2), uOpacity);
+      }
+    `,
+  });
+  const wormhole = new THREE.Mesh(wormGeo, wormMat);
+  wormhole.rotation.x = Math.PI / 2;
+  wormhole.position.z = -25;
+  wormhole.visible = false;
+  scene.add(wormhole);
 
-  const ghostMatB = blobMat.clone();
-  ghostMatB.transparent = true;
-  ghostMatB.blending = THREE.AdditiveBlending;
-  ghostMatB.depthWrite = false;
-  const ghostB = new THREE.Mesh(geo, ghostMatB);
-  ghostB.scale.setScalar(1.12);
-  scene.add(ghostB);
-
-  // GPU particles with persistent orbital drift
+  // Particles
   const PCOUNT = 1400;
   const pPos = new Float32Array(PCOUNT * 3);
   const pVel = new Float32Array(PCOUNT * 3);
@@ -170,17 +175,24 @@ export const createLiquidChrome: PresetFactory = ({ canvas, getFrame }) => {
   const pGeo = new THREE.BufferGeometry();
   pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
   const pMat = new THREE.PointsMaterial({
-    size: 0.022,
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.85,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    size: 0.022, color: 0xffffff, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const points = new THREE.Points(pGeo, pMat);
   scene.add(points);
 
+  type Cfg = { worm: number; explode: number; blobOpacity: number; particleStreak: number };
+  const CFG: Record<string, Cfg> = {
+    "bloom":          { worm: 0,    explode: 0,    blobOpacity: 1, particleStreak: 0 },
+    "wormhole":       { worm: 1,    explode: 0,    blobOpacity: 0.5, particleStreak: 1 },
+    "shatter-orbit":  { worm: 0.3,  explode: 1,    blobOpacity: 0.7, particleStreak: 0.4 },
+    "liquid-rebirth": { worm: 0,    explode: 0.2,  blobOpacity: 1, particleStreak: 0 },
+  };
+  const cur: Cfg = { worm: 0, explode: 0, blobOpacity: 1, particleStreak: 0 };
+  const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+
   let hue = 0;
+  let burst = 0;
 
   return {
     resize(w, h, dpr) {
@@ -191,96 +203,103 @@ export const createLiquidChrome: PresetFactory = ({ canvas, getFrame }) => {
     },
     render(t, dt) {
       const f = getFrame();
+      const s = director.update(t, f);
+      const tgt = CFG[s.id] ?? CFG.bloom;
+      const k = 1 - Math.pow(0.001, dt * 1.4);
+      cur.worm = lerp(cur.worm, tgt.worm, k);
+      cur.explode = lerp(cur.explode, tgt.explode, k);
+      cur.blobOpacity = lerp(cur.blobOpacity, tgt.blobOpacity, k);
+      cur.particleStreak = lerp(cur.particleStreak, tgt.particleStreak, k);
+
       hue = (hue + dt * (0.03 + f.mid * 0.15)) % 1;
+      if (f.drop) burst = 1;
+      burst *= Math.pow(0.001, dt);
 
       bgMat.uniforms.uTime.value = t;
       bgMat.uniforms.uHue.value = hue;
       bgMat.uniforms.uLevel.value = f.level;
 
-      const setBlob = (m: THREE.ShaderMaterial, hueOff: number) => {
-        m.uniforms.uTime.value = t;
-        m.uniforms.uBass.value = f.bass;
-        m.uniforms.uTreble.value = f.treble;
-        m.uniforms.uLevel.value = f.level;
-        m.uniforms.uHue.value = hue + hueOff;
-      };
-      setBlob(blobMat, 0);
-      setBlob(ghostMatA, 0.1);
-      setBlob(ghostMatB, 0.2);
-      ghostMatA.opacity = 0.4;
-      ghostMatB.opacity = 0.22;
+      blobMat.uniforms.uTime.value = t;
+      blobMat.uniforms.uBass.value = f.bass;
+      blobMat.uniforms.uTreble.value = f.treble;
+      blobMat.uniforms.uLevel.value = f.level;
+      blobMat.uniforms.uHue.value = hue;
+      blobMat.uniforms.uExplode.value = cur.explode * (0.6 + f.bass * 0.8);
+      blobMat.uniforms.uOpacity.value = cur.blobOpacity;
 
-      // Continuous 3-axis lissajous tumble — always moving
       blob.rotation.x = Math.sin(t * 0.31) * 0.6 + t * 0.15;
       blob.rotation.y = Math.cos(t * 0.27) * 0.7 + t * (0.2 + f.mid * 0.6);
-      blob.rotation.z = Math.sin(t * 0.19) * 0.4;
-      ghostA.rotation.copy(blob.rotation);
-      ghostB.rotation.copy(blob.rotation);
-      const s = 1 + Math.sin(t * 0.6) * 0.05 + f.bass * 0.3;
-      blob.scale.setScalar(s);
-      ghostA.scale.setScalar(s * 1.06);
-      ghostB.scale.setScalar(s * 1.12);
+      blob.rotation.z = Math.sin(t * 0.19) * 0.4 + cur.explode * t * 0.8;
+      const ss = 1 + Math.sin(t * 0.6) * 0.05 + f.bass * 0.3 + burst * 0.3;
+      blob.scale.setScalar(ss);
 
-      // particles: persistent orbital current + beat burst
+      // Wormhole
+      wormhole.visible = cur.worm > 0.02;
+      wormMat.uniforms.uTime.value = t;
+      wormMat.uniforms.uBass.value = f.bass;
+      wormMat.uniforms.uOpacity.value = cur.worm;
+      wormMat.uniforms.uHue.value = hue;
+      wormhole.position.z = -25 + Math.sin(t * 0.3) * 2;
+
+      // Particles
       const pos = pGeo.getAttribute("position") as THREE.BufferAttribute;
       const arr = pos.array as Float32Array;
-      const orbitalK = 0.6 + f.mid * 1.2; // always orbiting
+      const orbitalK = 0.6 + f.mid * 1.2;
+      const streak = cur.particleStreak * (4 + f.bass * 8);
       for (let i = 0; i < PCOUNT; i++) {
         const ix = i * 3;
-        const px = arr[ix], py = arr[ix + 1], pz = arr[ix + 2];
-        const r = Math.hypot(px, py, pz) || 1;
-
-        // tangential current (orbital)
-        const tx = -py;
-        const ty = px;
+        const px = arr[ix], py = arr[ix + 1];
+        const tx = -py, ty = px;
         const tlen = Math.hypot(tx, ty) || 1;
         const orbStep = orbitalK * dt;
         arr[ix] += (tx / tlen) * orbStep * 0.06;
         arr[ix + 1] += (ty / tlen) * orbStep * 0.06;
-        // slow z bob
         arr[ix + 2] += Math.sin(t * 0.5 + i * 0.01) * dt * 0.04;
+        // wormhole streaming
+        arr[ix + 2] += streak * dt;
+        if (arr[ix + 2] > 4) arr[ix + 2] -= 10;
 
-        if (f.beat) {
-          const k = 0.04 + f.bass * 0.12;
-          pVel[ix] += (px / r) * k;
-          pVel[ix + 1] += (py / r) * k;
-          pVel[ix + 2] += (pz / r) * k;
+        if (f.beat || f.drop) {
+          const r = Math.hypot(arr[ix], arr[ix + 1], arr[ix + 2]) || 1;
+          const kk = 0.04 + f.bass * 0.12 + (f.drop ? 0.2 : 0);
+          pVel[ix] += (arr[ix] / r) * kk;
+          pVel[ix + 1] += (arr[ix + 1] / r) * kk;
+          pVel[ix + 2] += (arr[ix + 2] / r) * kk;
         }
         arr[ix] += pVel[ix];
         arr[ix + 1] += pVel[ix + 1];
         arr[ix + 2] += pVel[ix + 2];
-        pVel[ix] *= 0.94;
-        pVel[ix + 1] *= 0.94;
-        pVel[ix + 2] *= 0.94;
+        pVel[ix] *= 0.94; pVel[ix + 1] *= 0.94; pVel[ix + 2] *= 0.94;
 
-        // pull back toward shell
+        // pull back to shell (weakened during wormhole)
+        const pullW = 1 - cur.particleStreak * 0.8;
         const nr = Math.hypot(arr[ix], arr[ix + 1], arr[ix + 2]) || 1;
         const target = 1.4;
-        const pull = (target - nr) * 0.01;
+        const pull = (target - nr) * 0.01 * pullW;
         arr[ix] += (arr[ix] / nr) * pull;
         arr[ix + 1] += (arr[ix + 1] / nr) * pull;
         arr[ix + 2] += (arr[ix + 2] / nr) * pull;
       }
       pos.needsUpdate = true;
       points.rotation.y -= dt * 0.1;
+      pMat.size = 0.022 + cur.particleStreak * 0.04;
 
-      // Camera also lazy-orbits
-      camera.position.x = Math.sin(t * 0.2) * 0.4;
-      camera.position.y = Math.cos(t * 0.17) * 0.3;
-      camera.position.z = 4.5 - f.bass * 0.6 + Math.sin(t * 0.3) * 0.2;
-      camera.lookAt(0, 0, 0);
+      // Camera: pull in during wormhole; orbit otherwise
+      const camZ = 4.5 - cur.worm * 3.5 - f.bass * 0.6 + Math.sin(t * 0.3) * 0.2;
+      camera.position.x = Math.sin(t * 0.2) * 0.4 * (1 - cur.worm * 0.7);
+      camera.position.y = Math.cos(t * 0.17) * 0.3 * (1 - cur.worm * 0.7);
+      camera.position.z = camZ;
+      camera.lookAt(0, 0, -cur.worm * 5);
+      camera.fov = 50 + burst * 20 + cur.worm * 15;
+      camera.updateProjectionMatrix();
 
       renderer.render(scene, camera);
     },
     dispose() {
-      geo.dispose();
-      blobMat.dispose();
-      ghostMatA.dispose();
-      ghostMatB.dispose();
-      bgGeo.dispose();
-      bgMat.dispose();
-      pGeo.dispose();
-      pMat.dispose();
+      geo.dispose(); blobMat.dispose();
+      bgGeo.dispose(); bgMat.dispose();
+      wormGeo.dispose(); wormMat.dispose();
+      pGeo.dispose(); pMat.dispose();
       renderer.dispose();
     },
   };

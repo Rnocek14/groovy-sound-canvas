@@ -43,6 +43,9 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       level: 0,
       beat: false,
       sinceBeat: 999,
+      drop: false,
+      energy: 0,
+      flux: 0,
     };
 
     const mountPreset = (id: PresetId) => {
