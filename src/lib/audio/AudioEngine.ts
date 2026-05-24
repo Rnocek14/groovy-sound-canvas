@@ -7,6 +7,9 @@ export type AudioFrame = {
   level: number;
   beat: boolean;
   sinceBeat: number; // seconds
+  drop: boolean;       // big energy spike, advances scenes
+  energy: number;      // long-window level EMA
+  flux: number;        // spectral flux 0..1
 };
 
 export class AudioEngine {
@@ -28,6 +31,16 @@ export class AudioEngine {
   private historySize = 43; // ~0.7s at 60fps
   private lastBeatAt = 0;
   private minBeatGap = 0.18; // seconds
+
+  // Drop detection
+  private levelHistory: number[] = [];
+  private levelHistorySize = 120; // ~2s
+  private lastDropAt = -10;
+  private minDropGap = 0.7;
+  private energyLongEMA = 0;
+
+  // Spectral flux
+  private prevFFT: Float32Array | null = null;
 
   sensitivity = 1;
 
@@ -80,6 +93,9 @@ export class AudioEngine {
         level: 0,
         beat: false,
         sinceBeat: 999,
+        drop: false,
+        energy: 0,
+        flux: 0,
       };
     }
     a.getByteFrequencyData(this.fft);
@@ -137,6 +153,45 @@ export class AudioEngine {
       this.lastBeatAt = now;
     }
 
+    // Long energy EMA + drop detection
+    this.energyLongEMA = this.energyLongEMA * 0.985 + this.levelEMA * 0.015;
+    this.levelHistory.push(this.levelEMA);
+    if (this.levelHistory.length > this.levelHistorySize) this.levelHistory.shift();
+    let lMean = 0;
+    for (let i = 0; i < this.levelHistory.length; i++) lMean += this.levelHistory[i];
+    lMean = this.levelHistory.length ? lMean / this.levelHistory.length : 0;
+    let lVar = 0;
+    for (let i = 0; i < this.levelHistory.length; i++) {
+      const d = this.levelHistory[i] - lMean;
+      lVar += d * d;
+    }
+    lVar = this.levelHistory.length ? lVar / this.levelHistory.length : 0;
+    const dropThresh = lMean + Math.max(0.08, Math.sqrt(lVar) * 2.5);
+    let drop = false;
+    if (
+      now - this.lastDropAt > this.minDropGap &&
+      this.levelEMA > dropThresh &&
+      this.levelEMA > 0.22 &&
+      bass > 0.35
+    ) {
+      drop = true;
+      this.lastDropAt = now;
+    }
+
+    // Spectral flux (positive deltas, normalized)
+    let flux = 0;
+    if (!this.prevFFT || this.prevFFT.length !== this.fft.length) {
+      this.prevFFT = new Float32Array(this.fft.length);
+    }
+    let fluxSum = 0;
+    for (let i = 0; i < this.fft.length; i++) {
+      const v = this.fft[i] / 255;
+      const d = v - this.prevFFT[i];
+      if (d > 0) fluxSum += d;
+      this.prevFFT[i] = v;
+    }
+    flux = Math.min(1, fluxSum / Math.max(1, this.fft.length * 0.05));
+
     return {
       fft: this.fft,
       time: this.time,
@@ -146,6 +201,9 @@ export class AudioEngine {
       level: this.levelEMA,
       beat,
       sinceBeat,
+      drop,
+      energy: this.energyLongEMA,
+      flux,
     };
   }
 }
