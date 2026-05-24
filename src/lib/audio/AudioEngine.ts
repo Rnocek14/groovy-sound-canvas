@@ -158,10 +158,13 @@ export class AudioEngine {
     if (bass > threshold && bass > 0.18 && sinceBeat > this.minBeatGap) {
       beat = true;
       this.lastBeatAt = now;
+      this.beatTimes.push(now);
+      if (this.beatTimes.length > 24) this.beatTimes.shift();
     }
 
     // Long energy EMA + drop detection
     this.energyLongEMA = this.energyLongEMA * 0.985 + this.levelEMA * 0.015;
+    this.shortLevelEMA = this.shortLevelEMA * 0.92 + this.levelEMA * 0.08;
     this.levelHistory.push(this.levelEMA);
     if (this.levelHistory.length > this.levelHistorySize) this.levelHistory.shift();
     let lMean = 0;
@@ -185,8 +188,7 @@ export class AudioEngine {
       this.lastDropAt = now;
     }
 
-    // Spectral flux (positive deltas, normalized)
-    let flux = 0;
+    // Spectral flux
     if (!this.prevFFT || this.prevFFT.length !== this.fft.length) {
       this.prevFFT = new Float32Array(this.fft.length);
     }
@@ -197,7 +199,26 @@ export class AudioEngine {
       if (d > 0) fluxSum += d;
       this.prevFFT[i] = v;
     }
-    flux = Math.min(1, fluxSum / Math.max(1, this.fft.length * 0.05));
+    const flux = Math.min(1, fluxSum / Math.max(1, this.fft.length * 0.05));
+
+    // BPM from beat intervals (median of last N gaps)
+    let bpm = 0;
+    if (this.beatTimes.length >= 4) {
+      const gaps: number[] = [];
+      for (let i = 1; i < this.beatTimes.length; i++) gaps.push(this.beatTimes[i] - this.beatTimes[i - 1]);
+      gaps.sort((a, b) => a - b);
+      const med = gaps[Math.floor(gaps.length / 2)];
+      if (med > 0.2 && med < 1.5) bpm = Math.round(60 / med);
+    }
+
+    // Phase
+    const elapsed = now - this.startedAt;
+    let phase: SongPhase = "groove";
+    if (elapsed < 4 || this.energyLongEMA < 0.05) phase = "intro";
+    else if (now - this.lastDropAt < 4) phase = "drop";
+    else if (this.shortLevelEMA < this.energyLongEMA * 0.55) phase = "breakdown";
+    else if (this.shortLevelEMA > this.energyLongEMA * 1.18 && this.shortLevelEMA > lMean * 1.1) phase = "build";
+    this.phase = phase;
 
     return {
       fft: this.fft,
@@ -206,11 +227,12 @@ export class AudioEngine {
       mid: this.midEMA,
       treble: this.trebleEMA,
       level: this.levelEMA,
-      beat,
-      sinceBeat,
-      drop,
+      beat, sinceBeat, drop,
       energy: this.energyLongEMA,
       flux,
+      phase: this.phase,
+      shortEnergy: this.shortLevelEMA,
+      bpm,
     };
   }
 }
