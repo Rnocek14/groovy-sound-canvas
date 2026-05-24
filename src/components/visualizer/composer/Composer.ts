@@ -226,8 +226,13 @@ export class Composer {
   }
 
   private remix(initial: boolean) {
-    // weighted pick honoring AI hints
-    const weighted = this.all.map((m) => ({ m, w: (this.hintWeights.get(m.id) ?? 1) * (0.5 + Math.random()) }));
+    // weighted pick honoring AI hints; boost camera-echo strongly when camera is live
+    const camLive = MediaBank.hasCamera();
+    const weighted = this.all.map((m) => {
+      const base = this.hintWeights.get(m.id) ?? 1;
+      const camBoost = camLive && m.id === "camera-echo" ? 5 : 1;
+      return { m, w: base * camBoost * (0.5 + Math.random()) };
+    });
     weighted.sort((a, b) => b.w - a.w);
     const target = this.pool.activeCount;
     const pick: VModule[] = [];
