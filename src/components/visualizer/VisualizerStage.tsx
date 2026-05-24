@@ -25,6 +25,7 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       bass: 0, mid: 0, treble: 0, level: 0,
       beat: false, sinceBeat: 999, drop: false, energy: 0, flux: 0,
       phase: "intro", shortEnergy: 0, bpm: 0,
+      centroid: 0, percuss: 0, bassToTreble: 1,
     };
     let dropsInWindow: number[] = [];
     let lastAICall = -10;
