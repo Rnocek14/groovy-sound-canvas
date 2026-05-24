@@ -39,9 +39,30 @@ class CameraSourceImpl {
       this.facing = facing;
       const v = document.createElement("video");
       v.muted = true;
+      v.defaultMuted = true;
       v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.setAttribute("muted", "");
       v.autoplay = true;
+      v.crossOrigin = "anonymous";
+      // CRITICAL: iOS Safari + some Chromium builds won't decode frames
+      // into a VideoTexture unless the <video> is attached to the DOM.
+      v.style.position = "fixed";
+      v.style.left = "-9999px";
+      v.style.top = "0";
+      v.style.width = "2px";
+      v.style.height = "2px";
+      v.style.opacity = "0";
+      v.style.pointerEvents = "none";
+      document.body.appendChild(v);
       v.srcObject = stream;
+      // Wait for metadata so videoWidth/Height are known before texture upload
+      await new Promise<void>((resolve) => {
+        if (v.readyState >= 1) return resolve();
+        const onMeta = () => { v.removeEventListener("loadedmetadata", onMeta); resolve(); };
+        v.addEventListener("loadedmetadata", onMeta);
+      });
       await v.play().catch(() => {});
       this.video = v;
       const tex = new THREE.VideoTexture(v);
@@ -49,6 +70,7 @@ class CameraSourceImpl {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.minFilter = THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
       this.texture = tex;
       MediaBank.attachCamera(tex, v, this.isMirrored);
       this.status = "live";
@@ -84,6 +106,7 @@ class CameraSourceImpl {
     if (this.video) {
       this.video.pause();
       this.video.srcObject = null;
+      if (this.video.parentNode) this.video.parentNode.removeChild(this.video);
       this.video = null;
     }
     if (this.texture) {
