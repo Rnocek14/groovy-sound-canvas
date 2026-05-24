@@ -1,106 +1,123 @@
 ## Goal
 
-Stop feeling like "one visual that moves to sound." Make every preset an **auto-cycling journey of 3–5 scenes**, with ChromeTunnel as the hero (deeper, faster, branching) and the other three as supporting tunnel-flavored rides. Audio drives both continuous motion (per-band) AND discrete events (drops trigger cuts).
+Make the visualizer feel like classic WMP / Milkdrop: always evolving, layered, surprising. The fix is architectural — stop building monolithic per-preset shaders, and instead compose 2–3 small **visual modules** at a time from a shared library, then aggressively remix them.
 
-## 1. Upgrade AudioEngine with drop detection + scene clock
+## 1. Module library (`src/components/visualizer/modules/`)
 
-Extend `AudioFrame` and `AudioEngine.read()`:
+Each module is a tiny self-contained renderer with `mount(layer)`, `update(t, dt, frame, intensity)`, `dispose()`, and a `layer` hint (`bg`, `mid`, `fg`, `post`). All are GPU-accelerated where possible; 2D modules render into a shared offscreen canvas.
 
-- `drop: boolean` — bigger threshold than `beat` (energy spike 2.5× variance, min 0.6s gap, requires sustained level rise over last ~1s). Fires on real drops, not every kick.
-- `energy: number` — long-window (≈3s) EMA of `level`; used to detect quiet→loud transitions.
-- `flux: number` — spectral flux (sum of positive FFT bin deltas), normalized. Highs detail without relying on beat.
+Build ~10 modules:
 
-Engine stays backwards compatible; presets opt in.
+| Module | Layer | Description |
+|---|---|---|
+| `TunnelRings` | mid | Forward-flying torus/hex rings, color cycles by depth |
+| `ParticleSwarm` | mid | 3000-pt GPU swarm with curl-noise flow field, beat bursts outward |
+| `RibbonField` | mid | 60 sinusoidal ribbons in 3D, mid-frequency drives twist |
+| `Plexus` | mid | Floating points + lines between near neighbors, classic music-app look |
+| `Supershape` | fg | Morphing superformula geometry, parameters drift continuously |
+| `Kaleidoscope` | post | Polar mirror post-effect with rotating segment count |
+| `Starfield` | bg | Parallax 3-layer starfield, treble = density |
+| `RingBurst` | fg | Spawns expanding rings on beats/drops, palette per ring |
+| `BouncingGeo` | mid | 4–8 chrome platonic solids tumbling with spring physics, beat impulses |
+| `FractalWarp` | post | Domain-warp + zoom post on the back canvas |
+| `NeonGrid` | bg | Synthwave grid floor + sun, scrolls forward |
+| `Wormhole` | bg | Cylindrical chrome tunnel, camera-aligned |
 
-## 2. Shared SceneDirector (new file `presets/SceneDirector.ts`)
+Modules share `intensity` (0..1) from the director so they can fade in/out smoothly.
 
-A tiny helper every preset uses:
+## 2. Composition engine (`Composer.ts`)
 
-```ts
-new SceneDirector({
-  scenes: ["approach", "warp", "break", "nebula", "rebirth"],
-  minDuration: 18, // seconds
-  maxDuration: 32,
-  advanceOnDrop: true,
-})
-```
+One shared `THREE.WebGLRenderer` + `Scene` per preset instance (or a hybrid 2D+3D pipeline for GlitchVHS). The composer:
 
-API: `update(t, frame) -> { id, age, progress, justEntered, transition01 }`.
-- Auto-advances after `minDuration` if a drop hits, else hard-cuts at `maxDuration`.
-- Exposes a 0→1 `transition01` (≈1.2s crossfade window) so presets can blend geometry/palette between scenes.
-- Deterministic seeded order so each preset has a curated journey, not random.
+- Keeps the active module set (≤3 active at a time).
+- Per remix, picks a new module combo from a curated pool that fits the preset's genre.
+- Crossfades modules in/out via their `intensity` over ~1s.
+- Per remix, also randomizes a `CameraDirector` behavior (dolly, orbit, spin, snap-zoom-out, free-roam Bezier).
+- Runs a `PaletteEngine` that lerps between 8 hand-picked palettes; flips palette on drops 40% of the time.
 
-## 3. ChromeTunnel → "Hyperspeed Journey" (hero)
+## 3. RemixDirector
 
-5-scene ride, each scene swaps tunnel geometry + camera behavior + palette family. Bass drives forward speed, mids drive ring warp amplitude, treble drives chromatic-aberration intensity, drops trigger scene cuts and a flash + FOV punch.
+Replaces the current SceneDirector. Three timing layers running concurrently:
 
-| Scene | Geometry | Camera | Palette |
-|---|---|---|---|
-| approach | Sparse wide rings, gentle drift | Slow dolly-in, slight roll | Deep magenta → cyan |
-| warp | Dense rings + radial speed lines (instanced) | Hard forward acceleration, FOV 75→110 | White-hot core, blue rim |
-| break | Tunnel ends → open neon grid plane + distant sun | Camera pulls up & banks | Sunset orange/pink |
-| corridor | Hex-prism tunnel (replaces torus rings) with branching side passages (extra ring chain offset on X) | Lissajous side-to-side | Acid green / chrome |
-| rebirth | Particle wormhole (GPU points spiraling toward camera) | Spin + zoom-out reveal | Vaporwave purple |
+- **Macro (remix)** every 10–18s OR on drop: swap 1–2 of the active modules, swap camera behavior, optionally flip palette.
+- **Meso (variation)** every 4–8s: tweak module parameters (segment count, swarm flow speed, ring spawn rate), no module swaps.
+- **Micro (events)** every 1.5–4s + every drop/beat: fire a one-shot event (white flash, RGB invert blip, snap zoom punch, ring burst, geometry morph, kaleido segment-count jump, palette rotate 60°). Continuous low-level background ensures something is always changing even in silence.
 
-Implementation notes:
-- Build all 5 scene rigs once, toggle `.visible` + lerp `material.opacity` via `transition01`.
-- Base ring forward speed: `2.5 + bass*6 + sceneSpeedMul`. Never drops below baseline so silence still moves.
-- Branching passages = a second ring chain with `position.x` offset, faded in only during `corridor`.
+A small `EventBus` lets any module subscribe to events (e.g. `RingBurst` listens for `beat-burst`, `Kaleidoscope` listens for `mirror-flip`).
 
-## 4. MilkdropPlasma — supporting (kaleidoscope tunnel)
+## 4. Preset genres
 
-Keep ping-pong feedback shader; add a `uTunnelMode` uniform that warps UVs into a **tunnel projection** (`uv = vec2(atan(p.y,p.x), 1.0/length(p))`). Director cycles 4 scenes by modulating shader uniforms only (no geometry swap):
+Each preset becomes a curated module pool + visual identity, not a unique implementation. The director still rotates within each preset's pool so each preset feels distinct.
 
-1. **kaleido** — current 6-segment mirror
-2. **tunnel** — polar tunnel warp, scrolling Z
-3. **fractal-zoom** — domain-warp amplitude ramps, continuous zoom-in
-4. **shatter** — on drop: snapshot current frame, fragment into triangles via barycentric noise, reform
+- **Hyperspeed Tunnel** — pool: TunnelRings, Wormhole, NeonGrid, Starfield, ParticleSwarm, RingBurst, BouncingGeo. Camera bias: forward dolly. Palette: vaporwave/chrome.
+- **Acid Plasma** — pool: FractalWarp, Kaleidoscope, RibbonField, ParticleSwarm, Plexus, Supershape. Camera bias: slow orbit. Palette: hot acid.
+- **Datamosh VHS** — pool: TunnelRings (2D variant), RibbonField, ParticleSwarm, Plexus, BouncingGeo, plus 2D glitch post (RGB drift, scanlines, tape rewind, kill-signal). Palette: high-contrast neon.
+- **Liquid Chrome** — pool: Supershape, Wormhole, BouncingGeo, ParticleSwarm, RibbonField, RingBurst. Camera bias: free orbit. Palette: iridescent chrome.
 
-Per-band: bass → tunnel scroll speed, mid → warp amount, treble → palette rotation rate, drop → scene advance + 1-frame full feedback bloom.
+## 5. Audio reactivity (per-module mapping)
 
-## 5. GlitchVHS — supporting (datamosh tunnel)
+Modules opt into specific bands. Examples:
+- TunnelRings: bass → forward speed, mid → warp amplitude.
+- ParticleSwarm: bass → outward burst, treble → flow noise scale.
+- RibbonField: mid → twist, level → amplitude.
+- Plexus: treble → connection distance.
+- Kaleidoscope: drop → segment-count jump.
+- RingBurst: every beat → spawn one ring at palette-shifted hue.
+- BouncingGeo: drop → spring impulse + axis change.
 
-Add a perspective tunnel layer rendered with 2D canvas: nested rectangles vanishing to center, color-shifted per ring. 4 scenes:
+Drop and beat both broadcast on the EventBus; modules consume what they want.
 
-1. **broadcast** — current bars + feedback
-2. **tape-tunnel** — VHS rectangle tunnel rushing forward
-3. **scan-corrupt** — horizontal datamosh slabs sliding sideways
-4. **kill-signal** — on drop: full-frame invert + RGB tear + tracking-error roll
+## 6. Tap-to-skip + always-on motion
 
-Per-band: bass → tunnel ring spawn rate, mid → bar curvature, treble → static density, drop → scene advance + tape-rewind smear.
+- `VisualizerStage` wires a `pointerdown` on the wrapper to call `composer.skip()` which forces a macro remix immediately (with a quick flash so it feels intentional).
+- During silence the director still fires meso/micro events at min cadence so the screen never sits still.
+- Reduced-motion check: if `prefers-reduced-motion`, micro events go from 1.5–4s to 6–12s and camera snaps soften.
 
-## 6. LiquidChrome — supporting (chrome wormhole)
+## 7. Performance
 
-Replace the central blob during certain scenes with a chrome wormhole mesh (cylinder tunnel with reflective env-map material). 4 scenes:
+- Single renderer per preset instance, modules add/remove `Object3D`s to one scene.
+- Module pool: every module is instantiated once on mount and toggled via `intensity`, no runtime allocation during remix.
+- Hard cap: ≤3 active modules; particle counts scale down on mobile (devicePixelRatio > 2 or width < 500).
+- Aim for 60fps on a recent phone; expect 45–55 on older devices.
 
-1. **bloom** — current additive blobs + particles
-2. **wormhole** — camera enters chrome tunnel, particles streak forward
-3. **shatter-orbit** — blob explodes into orbiting chrome shards
-4. **liquid-rebirth** — shards converge back into blob
+## 8. Files
 
-Per-band: bass → wormhole speed + blob displacement, mid → iridescence shift, treble → particle streak length, drop → scene advance + radial particle burst.
-
-## 7. Consistency rules
-
-- Every preset always has motion at silence (baseline scene clock + min speeds).
-- Drops are visibly punctuating: a brief (≈150ms) global brightness/scale pop on every preset on `frame.drop`.
-- Scene transitions use `transition01` to crossfade so cuts aren't jarring — except `kill-signal` / `shatter` which deliberately hard-cut.
-- No new dependencies. No changes to routing, controls UI, or `VisualizerStage`'s preset switching.
-
-## Files
-
-**New**
-- `src/components/visualizer/presets/SceneDirector.ts`
+**New (most of the work lives here)**
+- `src/components/visualizer/modules/types.ts`
+- `src/components/visualizer/modules/TunnelRings.ts`
+- `src/components/visualizer/modules/ParticleSwarm.ts`
+- `src/components/visualizer/modules/RibbonField.ts`
+- `src/components/visualizer/modules/Plexus.ts`
+- `src/components/visualizer/modules/Supershape.ts`
+- `src/components/visualizer/modules/Kaleidoscope.ts`
+- `src/components/visualizer/modules/Starfield.ts`
+- `src/components/visualizer/modules/RingBurst.ts`
+- `src/components/visualizer/modules/BouncingGeo.ts`
+- `src/components/visualizer/modules/FractalWarp.ts`
+- `src/components/visualizer/modules/NeonGrid.ts`
+- `src/components/visualizer/modules/Wormhole.ts`
+- `src/components/visualizer/composer/Composer.ts`
+- `src/components/visualizer/composer/RemixDirector.ts`
+- `src/components/visualizer/composer/CameraDirector.ts`
+- `src/components/visualizer/composer/PaletteEngine.ts`
+- `src/components/visualizer/composer/EventBus.ts`
+- `src/components/visualizer/composer/presetPools.ts`
 
 **Edit**
-- `src/lib/audio/AudioEngine.ts` — add `drop`, `energy`, `flux` to `AudioFrame` and computation in `read()`.
-- `src/components/visualizer/presets/ChromeTunnel.ts` — full rewrite to 5-scene journey.
-- `src/components/visualizer/presets/MilkdropPlasma.ts` — add tunnel UV mode + 4-scene director.
-- `src/components/visualizer/presets/GlitchVHS.ts` — add tape tunnel layer + 4-scene director.
-- `src/components/visualizer/presets/LiquidChrome.ts` — add wormhole mesh + shard orbit + 4-scene director.
+- `src/components/visualizer/VisualizerStage.tsx` — mount the Composer with a preset's pool, wire `pointerdown` to `composer.skip()`.
+- Delete (or rewrite as thin shells) `presets/ChromeTunnel.ts`, `presets/MilkdropPlasma.ts`, `presets/GlitchVHS.ts`, `presets/LiquidChrome.ts`, `presets/SceneDirector.ts` — replaced by composer + module pools.
+
+**Unchanged**
+- `src/lib/audio/*` — AudioEngine already provides bass/mid/treble/level/beat/drop/energy/flux.
+- Controls dock, routing, permission gate.
 
 ## Out of scope
 
+- No new audio sources or controls.
+- No mic gain UI changes.
 - No video-layer changes.
-- No control-dock additions (scene cycling is automatic; manual scene-skip can be added later if you want).
-- No new audio source modes.
+
+## Risk + verification
+
+- **Risk**: too many active modules tank mobile FPS. Mitigation: hard cap at 3, particle/instance counts tied to viewport size.
+- **Verify**: load preview, watch for 20+ seconds per preset, confirm visible module swaps, palette flips, micro events, and that tap-to-skip works. Check console for WebGL errors.
