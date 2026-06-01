@@ -512,9 +512,14 @@ export class SilhouetteStage {
   }
 
   renderOverlay() {
-    if (!this.enabled || this.intensity < 0.01 || !this.videoTex) return;
-    // Clear stencil buffer for this overlay pass
-    this.renderer.clear(false, false, true);
+    if (!this.enabled || this.intensity < 0.01) return;
+    // God-rays + halo show immediately. Silhouette/interior/rim require the video texture.
+    const hasVideo = !!this.videoTex && !this.videoFailed;
+    if (this.silMesh) this.silMesh.visible = hasVideo;
+    if (this.interiorMesh) this.interiorMesh.visible = hasVideo;
+    if (this.rimMesh) this.rimMesh.visible = hasVideo;
+    // Clear stencil for this overlay pass (the post pass preserved it).
+    this.renderer.clearStencil();
     this.renderer.render(this.overlayScene, this.overlayCamera);
   }
 
