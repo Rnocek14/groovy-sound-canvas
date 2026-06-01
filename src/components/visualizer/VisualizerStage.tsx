@@ -210,5 +210,9 @@ export function VisualizerStage({ preset, vibeConfig, silhouetteOn = true, onNar
     };
   }, [fetchDirection, fetchArchetype, fetchMedia]);
 
+  useEffect(() => {
+    composerRef.current?.setSilhouetteEnabled(silhouetteOn);
+  }, [silhouetteOn]);
+
   return <div ref={wrapRef} className="absolute inset-0 overflow-hidden" />;
 }
