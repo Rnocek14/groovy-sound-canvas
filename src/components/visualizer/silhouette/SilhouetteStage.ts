@@ -122,6 +122,7 @@ export class SilhouetteStage {
       stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
       uniforms: {
         uVideo: { value: null }, uThreshold: { value: 0.35 },
+        uInvert: { value: 0 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
         uTime: { value: 0 }, uBass: { value: 0 }, uMid: { value: 0 }, uHigh: { value: 0 },
         uBands: { value: new Float32Array(8) },
@@ -132,10 +133,14 @@ export class SilhouetteStage {
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uVideo;
-        uniform float uThreshold, uEvaporate, uPrecipitate, uTime;
+        uniform float uThreshold, uInvert, uEvaporate, uPrecipitate, uTime;
         uniform float uBass, uMid, uHigh, uAspect, uFigureScale;
         uniform float uBands[8];
         float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+        bool inFigureLuma(float lum){
+          // uInvert==0: figure is DARK pixels. uInvert==1: figure is BRIGHT pixels.
+          return uInvert > 0.5 ? lum > uThreshold : lum < uThreshold;
+        }
         void main(){
           vec2 fuv = vUv;
           float figW = uFigureScale / uAspect;
@@ -144,7 +149,7 @@ export class SilhouetteStage {
           if(fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) discard;
           vec4 vid = texture2D(uVideo, fuv);
           float lum = dot(vid.rgb, vec3(0.299, 0.587, 0.114));
-          if(lum >= uThreshold) discard;
+          if(!inFigureLuma(lum)) discard;
           int band = int(clamp(fuv.y * 8.0, 0.0, 7.0));
           float bandVal = 0.0;
           if(band == 0) bandVal = uBands[0];
