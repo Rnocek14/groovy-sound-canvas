@@ -122,6 +122,7 @@ export class SilhouetteStage {
       stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
       uniforms: {
         uVideo: { value: null }, uThreshold: { value: 0.35 },
+        uInvert: { value: 0 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
         uTime: { value: 0 }, uBass: { value: 0 }, uMid: { value: 0 }, uHigh: { value: 0 },
         uBands: { value: new Float32Array(8) },
@@ -132,10 +133,14 @@ export class SilhouetteStage {
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uVideo;
-        uniform float uThreshold, uEvaporate, uPrecipitate, uTime;
+        uniform float uThreshold, uInvert, uEvaporate, uPrecipitate, uTime;
         uniform float uBass, uMid, uHigh, uAspect, uFigureScale;
         uniform float uBands[8];
         float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+        bool inFigureLuma(float lum){
+          // uInvert==0: figure is DARK pixels. uInvert==1: figure is BRIGHT pixels.
+          return uInvert > 0.5 ? lum > uThreshold : lum < uThreshold;
+        }
         void main(){
           vec2 fuv = vUv;
           float figW = uFigureScale / uAspect;
@@ -144,7 +149,7 @@ export class SilhouetteStage {
           if(fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) discard;
           vec4 vid = texture2D(uVideo, fuv);
           float lum = dot(vid.rgb, vec3(0.299, 0.587, 0.114));
-          if(lum >= uThreshold) discard;
+          if(!inFigureLuma(lum)) discard;
           int band = int(clamp(fuv.y * 8.0, 0.0, 7.0));
           float bandVal = 0.0;
           if(band == 0) bandVal = uBands[0];
@@ -165,7 +170,7 @@ export class SilhouetteStage {
             vec2 evapUv = fuv - vec2(hash(fuv + 0.5) * 0.04 - 0.02, drift);
             vec4 evapVid = texture2D(uVideo, clamp(evapUv, 0.0, 1.0));
             float evapLum = dot(evapVid.rgb, vec3(0.299, 0.587, 0.114));
-            if(evapTime < uEvaporate || evapLum >= uThreshold) discard;
+            if(evapTime < uEvaporate || !inFigureLuma(evapLum)) discard;
           }
           if(uPrecipitate < 0.99){
             float precipTime = hash(fuv) * 0.7 + (1.0 - fuv.y) * 0.3;
@@ -222,6 +227,7 @@ export class SilhouetteStage {
       stencilWrite: false, stencilFunc: THREE.NotEqualStencilFunc, stencilRef: 1,
       uniforms: {
         uVideo: { value: null }, uThreshold: { value: 0.4 },
+        uInvert: { value: 0 },
         uColor: { value: new THREE.Color() },
         uIntensity: { value: 0 }, uBass: { value: 0 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
@@ -233,7 +239,7 @@ export class SilhouetteStage {
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uVideo;
-        uniform float uThreshold, uRimWidth, uIntensity, uBass, uTime, uAspect, uFigureScale;
+        uniform float uThreshold, uInvert, uRimWidth, uIntensity, uBass, uTime, uAspect, uFigureScale;
         uniform float uEvaporate, uPrecipitate;
         uniform vec3 uColor;
         void main(){
@@ -250,7 +256,8 @@ export class SilhouetteStage {
               vec2 offset = vec2(float(dx), float(dy)) * uRimWidth * 0.5;
               vec4 s = texture2D(uVideo, clamp(clamped + offset, 0.0, 1.0));
               float lum = dot(s.rgb, vec3(0.299, 0.587, 0.114));
-              if(lum < uThreshold) rimVal += 1.0;
+              bool inFig = uInvert > 0.5 ? lum > uThreshold : lum < uThreshold;
+              if(inFig) rimVal += 1.0;
             }
           }
           rimVal /= 24.0;
@@ -346,7 +353,8 @@ export class SilhouetteStage {
     this.videoFailed = false;
     this.currentClip = clip;
     const vid = document.createElement("video");
-    vid.src = `/silhouette-clips/${clip.src}`;
+    const isUrl = /^(https?:)?\/\//.test(clip.src) || clip.src.startsWith("/");
+    vid.src = isUrl ? clip.src : `/silhouette-clips/${clip.src}`;
     vid.loop = true; vid.muted = true; vid.playsInline = true; vid.crossOrigin = "anonymous";
     vid.play().catch(() => {});
     vid.addEventListener("error", () => { this.videoFailed = true; }, { once: true });
@@ -354,8 +362,18 @@ export class SilhouetteStage {
       const tex = new THREE.VideoTexture(vid);
       tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
       this.videoTex = tex;
-      if (this.silMat) this.silMat.uniforms.uVideo.value = tex;
-      if (this.rimMat) this.rimMat.uniforms.uVideo.value = tex;
+      const threshold = clip.threshold ?? (clip.invertLuma ? 0.5 : 0.35);
+      const invert = clip.invertLuma ? 1 : 0;
+      if (this.silMat) {
+        this.silMat.uniforms.uVideo.value = tex;
+        this.silMat.uniforms.uThreshold.value = threshold;
+        this.silMat.uniforms.uInvert.value = invert;
+      }
+      if (this.rimMat) {
+        this.rimMat.uniforms.uVideo.value = tex;
+        this.rimMat.uniforms.uThreshold.value = threshold + 0.05;
+        this.rimMat.uniforms.uInvert.value = invert;
+      }
     }, { once: true });
     this.video = vid;
   }
