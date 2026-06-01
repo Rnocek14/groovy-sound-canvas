@@ -14,6 +14,8 @@ import type { VibeConfig } from "@/lib/vibe/types";
 export function VisualizerStage({ preset, vibeConfig, silhouetteOn = true, onNarrative }: { preset: PresetId; vibeConfig: VibeConfig | null; silhouetteOn?: boolean; onNarrative?: (s: { memory: string; timeline: import("@/lib/vibe/types").TimelineEntry[]; lastMood?: string; lastWord?: string }) => void }) {
   const onNarrativeRef = useRef(onNarrative);
   onNarrativeRef.current = onNarrative;
+  const silhouetteOnRef = useRef(silhouetteOn);
+  silhouetteOnRef.current = silhouetteOn;
   const wrapRef = useRef<HTMLDivElement>(null);
   const presetRef = useRef(preset);
   presetRef.current = preset;
@@ -77,6 +79,8 @@ export function VisualizerStage({ preset, vibeConfig, silhouetteOn = true, onNar
             .finally(() => { mediaGenInFlight = false; });
         }
       }
+      composer.initSilhouette(vibeRef.current ?? null);
+      composer.setSilhouetteEnabled(silhouetteOnRef.current);
       resize();
     };
     const resize = () => {
