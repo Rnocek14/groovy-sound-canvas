@@ -361,9 +361,17 @@ export class SilhouetteStage {
     const vid = document.createElement("video");
     const isUrl = /^(https?:)?\/\//.test(clip.src) || clip.src.startsWith("/");
     vid.src = isUrl ? clip.src : `/silhouette-clips/${clip.src}`;
-    vid.loop = true; vid.muted = true; vid.playsInline = true; vid.crossOrigin = "anonymous";
-    vid.play().catch(() => {});
-    vid.addEventListener("error", () => { this.videoFailed = true; }, { once: true });
+    vid.loop = true; vid.muted = true; vid.playsInline = true; vid.preload = "auto";
+    vid.setAttribute("muted", "");
+    vid.setAttribute("playsinline", "");
+    const tryPlay = () => { vid.play().catch(() => {}); };
+    tryPlay();
+    vid.addEventListener("canplay", tryPlay, { once: true });
+    vid.addEventListener("loadedmetadata", tryPlay, { once: true });
+    vid.addEventListener("error", () => {
+      this.videoFailed = true;
+      console.warn("[Silhouette] video failed:", clip.id, clip.src, vid.error);
+    }, { once: true });
     vid.addEventListener("loadeddata", () => {
       const tex = new THREE.VideoTexture(vid);
       tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
@@ -380,6 +388,7 @@ export class SilhouetteStage {
         this.rimMat.uniforms.uThreshold.value = threshold + 0.05;
         this.rimMat.uniforms.uInvert.value = invert;
       }
+      console.log("[Silhouette] loaded", clip.id, vid.videoWidth, "x", vid.videoHeight);
     }, { once: true });
     this.video = vid;
   }
