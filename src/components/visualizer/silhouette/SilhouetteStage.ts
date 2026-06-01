@@ -276,7 +276,8 @@ export class SilhouetteStage {
       `,
     });
     const rimMesh = new THREE.Mesh(quadGeo.clone(), this.rimMat);
-    rimMesh.renderOrder = 13; rimMesh.frustumCulled = false;
+    rimMesh.renderOrder = 13; rimMesh.frustumCulled = false; rimMesh.visible = false;
+    this.rimMesh = rimMesh;
     this.overlayScene.add(rimMesh);
 
     // Halo particles
