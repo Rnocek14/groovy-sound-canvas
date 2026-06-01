@@ -231,8 +231,8 @@ export class SilhouetteStage {
         uColor: { value: new THREE.Color() },
         uIntensity: { value: 0 }, uBass: { value: 0 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
-        uTime: { value: 0 }, uAspect: { value: 1 }, uFigureScale: { value: 0.42 },
-        uRimWidth: { value: 0.018 },
+        uTime: { value: 0 }, uAspect: { value: 1 }, uFigureScale: { value: 0.85 },
+        uRimWidth: { value: 0.022 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
       fragmentShader: `
