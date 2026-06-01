@@ -184,7 +184,8 @@ export class SilhouetteStage {
       `,
     });
     const silMesh = new THREE.Mesh(quadGeo.clone(), this.silMat);
-    silMesh.renderOrder = 11; silMesh.frustumCulled = false;
+    silMesh.renderOrder = 11; silMesh.frustumCulled = false; silMesh.visible = false;
+    this.silMesh = silMesh;
     this.overlayScene.add(silMesh);
 
     // Interior — renders only where stencil = 1
