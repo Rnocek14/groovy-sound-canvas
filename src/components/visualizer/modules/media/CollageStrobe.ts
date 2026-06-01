@@ -19,9 +19,10 @@ export const createCollageStrobe: ModuleFactory = ({ scene }): VModule => {
     uniforms[`uOff${i}`] = { value: new THREE.Vector4(Math.random(), Math.random(), 0.6 + Math.random() * 0.4, 0) };
   }
 
-  let texSelectors = "";
+  // GLSL ES 1.0 disallows assigning samplers to locals — sample directly in each branch.
+  let sampleBranches = "";
   for (let i = 0; i < N; i++) {
-    texSelectors += `if (idx == ${i}) { tex = uTex${i}; off = uOff${i}; }\n`;
+    sampleBranches += `${i === 0 ? "if" : "else if"} (idx == ${i}) { off = uOff${i}; vec2 uv = off.xy + local * off.z; col = texture2D(uTex${i}, fract(uv)).rgb; }\n`;
   }
 
   const mat = new THREE.ShaderMaterial({
@@ -40,11 +41,9 @@ export const createCollageStrobe: ModuleFactory = ({ scene }): VModule => {
         vec2 local = fract(vUv * uGrid);
         int idx = int(cell.y * uGrid + cell.x);
         if (idx >= 16) idx = idx - 16;
-        sampler2D tex = uTex0;
-        vec4 off = uOff0;
-        ${texSelectors}
-        vec2 uv = off.xy + local * off.z;
-        vec3 col = texture2D(tex, fract(uv)).rgb;
+        vec3 col = vec3(0.0);
+        vec4 off = vec4(0.0);
+        ${sampleBranches}
         // strobe on beat - invert random tiles
         float r = fract(sin(dot(cell, vec2(12.9898,78.233))) * 43758.5453);
         if (r < uBeat * 0.4) col = 1.0 - col;
