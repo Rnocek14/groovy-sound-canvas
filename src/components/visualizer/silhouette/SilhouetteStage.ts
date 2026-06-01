@@ -222,7 +222,8 @@ export class SilhouetteStage {
       `,
     });
     const interiorMesh = new THREE.Mesh(quadGeo.clone(), this.interiorMat);
-    interiorMesh.renderOrder = 12; interiorMesh.frustumCulled = false;
+    interiorMesh.renderOrder = 12; interiorMesh.frustumCulled = false; interiorMesh.visible = false;
+    this.interiorMesh = interiorMesh;
     this.overlayScene.add(interiorMesh);
 
     // Rim glow (outside silhouette)
