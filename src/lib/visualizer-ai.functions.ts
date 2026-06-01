@@ -69,7 +69,7 @@ export const getVJDirection = createServerFn({ method: "POST" })
                 mood: { type: "string" },
                 word: { type: "string" },
                 narrativeUpdate: { type: "string" },
-                clipHint: { type: "string", description: "Silhouette clip id: dancer-slow, dancer-fierce, fighter-punch, rain-walk, city-walk, spinning-figure, reaching-up, fabric-flow, smoke-rise, birds-flock, city-skyline, falling-backward" },
+                clipHint: { type: "string", description: "Silhouette clip id: dancer-slow, rain-walk, fabric-flow, reaching-up", enum: ["dancer-slow","rain-walk","fabric-flow","reaching-up"] },
               },
               required: ["paletteHex", "feedback", "warp", "chroma", "kaleido", "scanlines", "glitch", "cameraBias", "moduleHints", "mood", "word", "narrativeUpdate", "clipHint"],
             },
