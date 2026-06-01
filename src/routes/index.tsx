@@ -5,6 +5,7 @@ import { VisualizerStage } from "@/components/visualizer/VisualizerStage";
 import { ControlsDock, TopBadge } from "@/components/visualizer/ControlsDock";
 import { MediaTray } from "@/components/visualizer/MediaTray";
 import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
+import { StoryOverlay, type StorySnapshot } from "@/components/visualizer/StoryOverlay";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { CameraSource } from "@/components/visualizer/media/CameraSource";
 import type { PresetId } from "@/components/visualizer/presets/types";
