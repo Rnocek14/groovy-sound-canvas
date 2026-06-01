@@ -8,6 +8,7 @@ import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { CameraSource } from "@/components/visualizer/media/CameraSource";
 import type { PresetId } from "@/components/visualizer/presets/types";
+import type { VibeConfig } from "@/lib/vibe/types";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const [started, setStarted] = useState(false);
+  const [vibeConfig, setVibeConfig] = useState<VibeConfig | null>(null);
   const [preset, setPreset] = useState<PresetId>("tunnel");
   const [sensitivity, setSensitivity] = useState(1.2);
   const [videoOn, setVideoOn] = useState(true);
@@ -52,7 +54,7 @@ function Index() {
     };
   }, []);
 
-  if (!started) return <PermissionGate onReady={() => setStarted(true)} />;
+  if (!started) return <PermissionGate onReady={(vibe) => { setVibeConfig(vibe); setStarted(true); }} />;
 
   return (
     <div
@@ -61,8 +63,9 @@ function Index() {
       onTouchStart={bump}
     >
       <VideoBackdrop enabled={videoOn} />
-      <VisualizerStage preset={preset} />
-      <TopBadge preset={preset} visible={uiVisible} />
+      <VisualizerStage preset={preset} vibeConfig={vibeConfig} />
+      <TopBadge preset={preset} visible={uiVisible} moodLabel={vibeConfig?.moodLabel ?? null} />
+
       <MediaTray visible={uiVisible} />
       <ControlsDock
         preset={preset}

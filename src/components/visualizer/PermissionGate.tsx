@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { audioEngine } from "@/lib/audio/AudioEngine";
+import { useServerFn } from "@tanstack/react-start";
+import { seedVibe } from "@/lib/vibe/seedVibe";
+import type { VibeConfig } from "@/lib/vibe/types";
 
 const inIframe = () => {
   try {
@@ -9,11 +12,13 @@ const inIframe = () => {
   }
 };
 
-export function PermissionGate({ onReady }: { onReady: () => void }) {
+export function PermissionGate({ onReady }: { onReady: (vibe: VibeConfig | null) => void }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [vibePrompt, setVibePrompt] = useState("");
+  const [seeding, setSeeding] = useState(false);
+  const fetchVibe = useServerFn(seedVibe);
 
-  // Synchronous click handler — getUserMedia called immediately within gesture.
   const start = (e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
     if (busy) return;
@@ -26,7 +31,6 @@ export function PermissionGate({ onReady }: { onReady: () => void }) {
       return;
     }
 
-    // Call getUserMedia SYNCHRONOUSLY in the gesture handler — no awaits before it.
     const p = navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: false,
@@ -39,10 +43,22 @@ export function PermissionGate({ onReady }: { onReady: () => void }) {
     p.then(async (stream) => {
       try {
         await audioEngine.start(stream);
-        onReady();
+        let vibe: VibeConfig | null = null;
+        const prompt = vibePrompt.trim();
+        if (prompt) {
+          setSeeding(true);
+          try {
+            vibe = await fetchVibe({ data: { prompt } });
+          } catch (vErr) {
+            console.debug("[seedVibe]", vErr);
+          }
+          setSeeding(false);
+        }
+        onReady(vibe);
       } catch (err2) {
         setErr(err2 instanceof Error ? err2.message : "Audio setup failed");
         setBusy(false);
+        setSeeding(false);
       }
     }).catch((err2: DOMException) => {
       let msg = err2.message || "Microphone blocked";
@@ -61,6 +77,25 @@ export function PermissionGate({ onReady }: { onReady: () => void }) {
       setBusy(false);
     });
   };
+
+  if (seeding) {
+    return (
+      <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-black px-6 text-white">
+        <div
+          className="absolute inset-0 opacity-40 animate-pulse"
+          style={{
+            background:
+              "radial-gradient(circle at 30% 20%, #ff2bd6 0%, transparent 50%), radial-gradient(circle at 70% 80%, #00f0ff 0%, transparent 55%)",
+            filter: "blur(60px)",
+          }}
+        />
+        <div className="relative z-10 flex flex-col items-center gap-4 text-center">
+          <p className="text-xs font-bold tracking-[0.4em] text-white/70">SETTING THE SCENE…</p>
+          <p className="max-w-sm text-balance text-sm italic text-white/80">"{vibePrompt}"</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-black px-6 text-white">
@@ -81,6 +116,20 @@ export function PermissionGate({ onReady }: { onReady: () => void }) {
             MIC-REACTIVE VISUALIZER
           </p>
         </div>
+
+        <div className="flex w-full max-w-xs flex-col items-center gap-2">
+          <p className="text-[10px] font-bold tracking-[0.3em] text-white/50">SET THE VIBE</p>
+          <input
+            type="text"
+            value={vibePrompt}
+            onChange={(e) => setVibePrompt(e.target.value.slice(0, 80))}
+            placeholder="lost in a neon city at 4am…"
+            maxLength={80}
+            disabled={busy}
+            className="w-full bg-transparent border-b border-white/30 pb-2 text-center text-sm text-white/90 placeholder:text-white/30 focus:outline-none focus:border-white/60 tracking-wide"
+          />
+        </div>
+
         <button
           type="button"
           onClick={start}
