@@ -124,56 +124,43 @@ export class SilhouetteStage {
       transparent: false, colorWrite: false, depthWrite: false, depthTest: false,
       stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
       uniforms: {
-        uVideo: { value: null }, uThreshold: { value: 0.35 },
-        uInvert: { value: 0 },
+        uVideo: { value: null }, uThreshold: { value: 0.5 },
+        uInvert: { value: 0 }, uSoftness: { value: 0.08 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
         uTime: { value: 0 }, uBass: { value: 0 }, uMid: { value: 0 }, uHigh: { value: 0 },
         uBands: { value: new Float32Array(8) },
-        uAspect: { value: 1 }, uFigureScale: { value: 0.42 },
+        uAspect: { value: 1 }, uFigureScale: { value: 0.85 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
       fragmentShader: `
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uVideo;
-        uniform float uThreshold, uInvert, uEvaporate, uPrecipitate, uTime;
+        uniform float uThreshold, uInvert, uSoftness, uEvaporate, uPrecipitate, uTime;
         uniform float uBass, uMid, uHigh, uAspect, uFigureScale;
         uniform float uBands[8];
         float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-        bool inFigureLuma(float lum){
-          // uInvert==0: figure is DARK pixels. uInvert==1: figure is BRIGHT pixels.
-          return uInvert > 0.5 ? lum > uThreshold : lum < uThreshold;
+        // Returns figure mask 0..1 with soft edges.
+        float figureMask(float lum){
+          float t0 = uThreshold - uSoftness;
+          float t1 = uThreshold + uSoftness;
+          float m = smoothstep(t0, t1, lum);
+          return uInvert > 0.5 ? m : (1.0 - m);
         }
         void main(){
+          // Map full-frame, centered figure. Letterbox via aspect.
           vec2 fuv = vUv;
           float figW = uFigureScale / uAspect;
           fuv.x = (fuv.x - 0.5) / figW + 0.5;
-          fuv.y = (fuv.y - 0.08) / uFigureScale;
+          fuv.y = (fuv.y - 0.5) / uFigureScale + 0.5;
           if(fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) discard;
           vec4 vid = texture2D(uVideo, fuv);
           float lum = dot(vid.rgb, vec3(0.299, 0.587, 0.114));
-          if(!inFigureLuma(lum)) discard;
-          int band = int(clamp(fuv.y * 8.0, 0.0, 7.0));
-          float bandVal = 0.0;
-          if(band == 0) bandVal = uBands[0];
-          else if(band == 1) bandVal = uBands[1];
-          else if(band == 2) bandVal = uBands[2];
-          else if(band == 3) bandVal = uBands[3];
-          else if(band == 4) bandVal = uBands[4];
-          else if(band == 5) bandVal = uBands[5];
-          else if(band == 6) bandVal = uBands[6];
-          else bandVal = uBands[7];
-          float noise = hash(fuv + uTime * 0.1) - 0.5;
-          float displacement = bandVal * 0.04 * noise;
-          vec2 displaced = fuv + vec2(displacement, displacement * 0.5);
-          if((displaced.x < 0.0 || displaced.x > 1.0 || displaced.y < 0.0 || displaced.y > 1.0) && bandVal > 0.5) discard;
+          float mask = figureMask(lum);
+          if(mask < 0.4) discard;
           if(uEvaporate > 0.01){
             float evapTime = hash(fuv) * 0.7 + fuv.y * 0.3;
-            float drift = uEvaporate * uEvaporate * 0.3;
-            vec2 evapUv = fuv - vec2(hash(fuv + 0.5) * 0.04 - 0.02, drift);
-            vec4 evapVid = texture2D(uVideo, clamp(evapUv, 0.0, 1.0));
-            float evapLum = dot(evapVid.rgb, vec3(0.299, 0.587, 0.114));
-            if(evapTime < uEvaporate || !inFigureLuma(evapLum)) discard;
+            if(evapTime < uEvaporate) discard;
           }
           if(uPrecipitate < 0.99){
             float precipTime = hash(fuv) * 0.7 + (1.0 - fuv.y) * 0.3;
@@ -195,14 +182,16 @@ export class SilhouetteStage {
       uniforms: {
         uScene: { value: null },
         uIntensity: { value: 1 }, uTime: { value: 0 }, uBass: { value: 0 },
-        uBrightness: { value: 1.2 }, uHueShift: { value: 0 },
+        uBrightness: { value: 2.6 }, uHueShift: { value: 0 }, uSaturation: { value: 1.7 },
+        uTint: { value: new THREE.Color(0xffffff) },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
       fragmentShader: `
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uScene;
-        uniform float uIntensity, uBass, uBrightness, uHueShift;
+        uniform float uIntensity, uBass, uBrightness, uHueShift, uSaturation;
+        uniform vec3 uTint;
         vec3 hueShift(vec3 col, float shift){
           float angle = shift * 6.28318;
           float s = sin(angle), c = cos(angle);
@@ -214,9 +203,15 @@ export class SilhouetteStage {
           return clamp(m * col, 0.0, 4.0);
         }
         void main(){
-          vec4 scene = texture2D(uScene, vUv);
-          vec3 col = scene.rgb * uBrightness;
-          col = hueShift(col, uHueShift + uBass * 0.05);
+          // Sample scene with slight zoom so the inside reveals more of the universe.
+          vec2 uv = (vUv - 0.5) * 0.85 + 0.5;
+          vec3 scene = texture2D(uScene, uv).rgb;
+          // Saturation boost
+          float lum = dot(scene, vec3(0.299, 0.587, 0.114));
+          scene = mix(vec3(lum), scene, uSaturation);
+          vec3 col = scene * uBrightness * (1.0 + uBass * 0.6);
+          col = hueShift(col, uHueShift + uBass * 0.08);
+          col *= uTint;
           gl_FragColor = vec4(col * uIntensity, 1.0);
         }
       `,
@@ -236,8 +231,8 @@ export class SilhouetteStage {
         uColor: { value: new THREE.Color() },
         uIntensity: { value: 0 }, uBass: { value: 0 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
-        uTime: { value: 0 }, uAspect: { value: 1 }, uFigureScale: { value: 0.42 },
-        uRimWidth: { value: 0.018 },
+        uTime: { value: 0 }, uAspect: { value: 1 }, uFigureScale: { value: 0.85 },
+        uRimWidth: { value: 0.022 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
       fragmentShader: `
@@ -251,7 +246,7 @@ export class SilhouetteStage {
           vec2 fuv = vUv;
           float figW = uFigureScale / uAspect;
           fuv.x = (fuv.x - 0.5) / figW + 0.5;
-          fuv.y = (fuv.y - 0.08) / uFigureScale;
+          fuv.y = (fuv.y - 0.5) / uFigureScale + 0.5;
           if(fuv.x < -uRimWidth || fuv.x > 1.0+uRimWidth || fuv.y < -uRimWidth || fuv.y > 1.0+uRimWidth) discard;
           float rimVal = 0.0;
           vec2 clamped = clamp(fuv, 0.0, 1.0);
