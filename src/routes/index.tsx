@@ -74,6 +74,7 @@ function Index() {
       <VisualizerStage
         preset={preset}
         vibeConfig={vibeConfig}
+        silhouetteOn={silhouetteOn}
         onNarrative={(s) =>
           setStory({
             memory: s.memory,
@@ -112,6 +113,11 @@ function Index() {
         videoOn={videoOn}
         setVideoOn={(v) => {
           setVideoOn(v);
+          bump();
+        }}
+        silhouetteOn={silhouetteOn}
+        setSilhouetteOn={(v) => {
+          setSilhouetteOn(v);
           bump();
         }}
         onExit={() => {
