@@ -8,12 +8,17 @@ import { getArchetype } from "@/lib/visualizer-archetype.functions";
 import { generateMedia } from "@/lib/visualizer-mediagen.functions";
 import { MediaBank } from "./media/MediaBank";
 import { ARCHETYPES, type ArchetypeId } from "./composer/archetypes";
+import { NarrativeEngine } from "@/lib/vibe/NarrativeEngine";
+import type { VibeConfig } from "@/lib/vibe/types";
 
-export function VisualizerStage({ preset }: { preset: PresetId }) {
+export function VisualizerStage({ preset, vibeConfig }: { preset: PresetId; vibeConfig: VibeConfig | null }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const presetRef = useRef(preset);
   presetRef.current = preset;
+  const vibeRef = useRef(vibeConfig);
+  vibeRef.current = vibeConfig;
   const composerRef = useRef<Composer | null>(null);
+  const narrativeRef = useRef<NarrativeEngine | null>(null);
   const fetchDirection = useServerFn(getVJDirection);
   const fetchArchetype = useServerFn(getArchetype);
   const fetchMedia = useServerFn(generateMedia);
@@ -33,6 +38,7 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       phase: "intro", shortEnergy: 0, bpm: 0,
       centroid: 0, percuss: 0, bassToTreble: 1,
     };
+    let prevPhase = "intro";
     let dropsInWindow: number[] = [];
     let lastAICall = -10;
     let aiInFlight = false;
@@ -55,6 +61,20 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       active = id;
       lastAICall = -10;
       startedAt = performance.now() / 1000;
+      narrativeRef.current = new NarrativeEngine(vibeRef.current ?? null);
+      if (vibeRef.current) {
+        composer.applyVibeConfig(vibeRef.current);
+        // Kick off a media gen tied to the vibe prompt for richer textures
+        if (!mediaGenInFlight) {
+          mediaGenInFlight = true;
+          fetchMedia({ data: { prompt: vibeRef.current.mediaPrompt } })
+            .then(async (m) => {
+              if (m?.dataUrl) await MediaBank.addAIGenerated(m.dataUrl, "house");
+            })
+            .catch((e) => console.debug("[vibe-media]", e))
+            .finally(() => { mediaGenInFlight = false; });
+        }
+      }
       resize();
     };
     const resize = () => {
@@ -67,26 +87,21 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
     mount(presetRef.current);
 
     const callAI = async (now: number) => {
-      if (aiInFlight || !composer) return;
+      if (aiInFlight || !composer || !narrativeRef.current) return;
       aiInFlight = true;
       try {
-        const dropsLastMin = dropsInWindow.filter((d) => now - d < 60).length;
-        const direction = await fetchDirection({ data: {
-          preset: presetRef.current,
-          phase: lastFrame.phase,
-          bpm: lastFrame.bpm,
-          energy: +lastFrame.energy.toFixed(3),
-          short: +lastFrame.shortEnergy.toFixed(3),
-          bass: +lastFrame.bass.toFixed(3),
-          mid: +lastFrame.mid.toFixed(3),
-          treble: +lastFrame.treble.toFixed(3),
-          flux: +lastFrame.flux.toFixed(3),
-          dropsLastMin,
-          elapsed: +(now - startedAt).toFixed(1),
-        } });
+        const elapsed = now - startedAt;
+        const context = narrativeRef.current.buildContext(lastFrame, elapsed);
+        const direction = await fetchDirection({ data: { context } });
         composer?.applyDirection(direction);
+        if (direction.narrativeUpdate) {
+          narrativeRef.current.updateMemory(direction.narrativeUpdate);
+        }
+        narrativeRef.current.recordAIDirection(
+          now,
+          `AI: ${direction.mood ?? ""} ${direction.word ?? ""}`.trim(),
+        );
       } catch (e) {
-        // silent fallback to local director
         console.debug("[VJ-AI]", e);
       } finally {
         aiInFlight = false;
@@ -108,7 +123,7 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
         } });
         if (r && (r.archetype as ArchetypeId) in ARCHETYPES) {
           composer?.setArchetypeId(r.archetype as ArchetypeId);
-          // queue media generation tied to this archetype + AI prompt
+          narrativeRef.current?.recordArchetypeChange(now, r.archetype);
           if (
             !mediaGenInFlight &&
             now - lastMediaGenAt > 60 &&
@@ -137,20 +152,27 @@ export function VisualizerStage({ preset }: { preset: PresetId }) {
       const dt = Math.min(0.05, now - last);
       last = now;
       lastFrame = audioEngine.read(now);
-      if (lastFrame.drop) dropsInWindow.push(now);
+      if (lastFrame.drop) {
+        dropsInWindow.push(now);
+        narrativeRef.current?.recordDrop(now);
+      }
+      if (lastFrame.beat) narrativeRef.current?.recordBeat();
+      if (lastFrame.phase !== prevPhase) {
+        narrativeRef.current?.recordPhaseChange(now, lastFrame.phase);
+        prevPhase = lastFrame.phase;
+      }
       if (dropsInWindow.length > 50) dropsInWindow = dropsInWindow.slice(-50);
       if (presetRef.current !== active) mount(presetRef.current);
       composer?.render(now, dt, lastFrame);
 
-      // VJ direction cadence (palette + post tweaks): first ~4s, then every 22s; faster on drops
-      const interval = lastFrame.drop && now - lastAICall > 12 ? 0 : 22;
-      const dueFirst = lastAICall < 0 && now - startedAt > 4 && lastFrame.energy > 0.02;
+      // VJ direction cadence: first ~3s, then every 15s; faster on drops (8s)
+      const interval = lastFrame.drop && now - lastAICall > 8 ? 0 : 15;
+      const dueFirst = lastAICall < 0 && now - startedAt > 3 && lastFrame.energy > 0.02;
       if ((dueFirst || (lastAICall > 0 && now - lastAICall > interval)) && audioEngine.analyser) {
         lastAICall = now;
         callAI(now);
       }
 
-      // Archetype classifier cadence: first ~8s, then every 30s
       const archDueFirst = lastArchCall < 0 && now - startedAt > 8 && lastFrame.energy > 0.03;
       if ((archDueFirst || (lastArchCall > 0 && now - lastArchCall > 30)) && audioEngine.analyser) {
         lastArchCall = now;

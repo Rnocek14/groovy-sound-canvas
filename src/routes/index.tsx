@@ -8,6 +8,7 @@ import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { CameraSource } from "@/components/visualizer/media/CameraSource";
 import type { PresetId } from "@/components/visualizer/presets/types";
+import type { VibeConfig } from "@/lib/vibe/types";
 
 export const Route = createFileRoute("/")({
   component: Index,
