@@ -170,7 +170,7 @@ export class SilhouetteStage {
             vec2 evapUv = fuv - vec2(hash(fuv + 0.5) * 0.04 - 0.02, drift);
             vec4 evapVid = texture2D(uVideo, clamp(evapUv, 0.0, 1.0));
             float evapLum = dot(evapVid.rgb, vec3(0.299, 0.587, 0.114));
-            if(evapTime < uEvaporate || evapLum >= uThreshold) discard;
+            if(evapTime < uEvaporate || !inFigureLuma(evapLum)) discard;
           }
           if(uPrecipitate < 0.99){
             float precipTime = hash(fuv) * 0.7 + (1.0 - fuv.y) * 0.3;
