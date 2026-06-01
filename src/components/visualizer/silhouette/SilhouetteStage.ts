@@ -445,8 +445,8 @@ export class SilhouetteStage {
 
   update(t: number, dt: number, f: AudioFrame, archetype: string, phase: string, w: number, h: number) {
     if (!this.enabled) { this.intensity += (0 - this.intensity) * Math.min(1, dt * 2); return; }
-    const targetIntensity = this.videoTex && !this.videoFailed ? 1 : 0;
-    this.intensity += (targetIntensity - this.intensity) * Math.min(1, dt * 0.8);
+    // Halo + god-rays ride at full strength even before the video loads.
+    this.intensity += (1 - this.intensity) * Math.min(1, dt * 0.8);
     this.advanceStateMachine(dt, archetype, phase, f.energy);
 
     const evap = this.state === "evaporating" ? this.transitionPhase : 0;
