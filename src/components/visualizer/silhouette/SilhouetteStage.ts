@@ -246,7 +246,7 @@ export class SilhouetteStage {
           vec2 fuv = vUv;
           float figW = uFigureScale / uAspect;
           fuv.x = (fuv.x - 0.5) / figW + 0.5;
-          fuv.y = (fuv.y - 0.08) / uFigureScale;
+          fuv.y = (fuv.y - 0.5) / uFigureScale + 0.5;
           if(fuv.x < -uRimWidth || fuv.x > 1.0+uRimWidth || fuv.y < -uRimWidth || fuv.y > 1.0+uRimWidth) discard;
           float rimVal = 0.0;
           vec2 clamped = clamp(fuv, 0.0, 1.0);
