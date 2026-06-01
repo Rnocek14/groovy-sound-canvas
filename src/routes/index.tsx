@@ -66,8 +66,31 @@ function Index() {
       onTouchStart={bump}
     >
       <VideoBackdrop enabled={videoOn} />
-      <VisualizerStage preset={preset} vibeConfig={vibeConfig} />
+      <VisualizerStage
+        preset={preset}
+        vibeConfig={vibeConfig}
+        onNarrative={(s) =>
+          setStory({
+            memory: s.memory,
+            timeline: s.timeline,
+            lastMood: s.lastMood,
+            lastWord: s.lastWord,
+            vibeLabel: vibeConfig?.moodLabel ?? null,
+          })
+        }
+      />
       <TopBadge preset={preset} visible={uiVisible} moodLabel={vibeConfig?.moodLabel ?? null} />
+
+      <button
+        onClick={() => { setStoryOpen((v) => !v); bump(); }}
+        className={`pointer-events-auto absolute right-4 top-[max(3rem,calc(env(safe-area-inset-top)+2.5rem))] z-20 rounded-full border px-3 py-1 text-[10px] font-bold tracking-widest backdrop-blur-md transition-opacity duration-300 ${
+          storyOpen ? "border-white bg-white text-black" : "border-white/40 bg-black/40 text-white/80"
+        } ${uiVisible ? "opacity-100" : "opacity-0"}`}
+      >
+        STORY
+      </button>
+
+      <StoryOverlay open={storyOpen} onClose={() => setStoryOpen(false)} snapshot={story} />
 
       <MediaTray visible={uiVisible} />
       <ControlsDock
