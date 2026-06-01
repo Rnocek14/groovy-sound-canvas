@@ -19,19 +19,48 @@ export type ClipTag = {
   vibeKeywords: string[];
 };
 
+// Only real footage — no aliases. Each clip points to a distinct video.
 export const CLIPS: ClipTag[] = [
-  { id: "dancer-slow", src: dancerSlowAsset.url, duration: 6, naturalBpm: 90, energy: "low", motion: "slow-drift", archetypes: ["ambient","house","classical"], phases: ["intro","breakdown","groove"], vibeKeywords: ["dance","float","dream","soft","slow"] },
-  { id: "dancer-fierce", src: dancerSlowAsset.url, duration: 4, naturalBpm: 128, energy: "high", motion: "dancing", archetypes: ["house","techno","hiphop","pop"], phases: ["drop","groove","build"], vibeKeywords: ["dance","club","energy","fierce","move"] },
-  { id: "fighter-punch", src: dancerSlowAsset.url, duration: 3, naturalBpm: 160, energy: "explosive", motion: "fighting", archetypes: ["dnb","techno","rock"], phases: ["drop","build"], vibeKeywords: ["fight","power","hard","raw","punch"] },
-  { id: "rain-walk", src: rainWalkAsset.url, duration: 8, naturalBpm: 85, invertLuma: true, threshold: 0.55, energy: "low", motion: "walking", archetypes: ["ambient","house","classical"], phases: ["intro","breakdown","groove"], vibeKeywords: ["rain","night","city","alone","walk","neon"] },
-  { id: "city-walk", src: rainWalkAsset.url, duration: 6, naturalBpm: 100, invertLuma: true, threshold: 0.55, energy: "medium", motion: "walking", archetypes: ["hiphop","house","techno"], phases: ["groove","build","intro"], vibeKeywords: ["city","urban","street","night","cool"] },
-  { id: "spinning-figure", src: fabricFlowAsset.url, duration: 4, naturalBpm: 120, invertLuma: true, threshold: 0.45, energy: "medium", motion: "spinning", archetypes: ["techno","house","dnb"], phases: ["groove","drop"], vibeKeywords: ["spin","orbit","rotate","hypnotic"] },
-  { id: "reaching-up", src: reachingUpAsset.url, duration: 5, naturalBpm: 95, invertLuma: true, threshold: 0.5, energy: "medium", motion: "slow-drift", archetypes: ["ambient","classical","house"], phases: ["build","groove","breakdown"], vibeKeywords: ["reach","sky","transcend","float","rise"] },
-  { id: "fabric-flow", src: fabricFlowAsset.url, duration: 7, naturalBpm: 75, invertLuma: true, threshold: 0.45, energy: "low", motion: "abstract", archetypes: ["ambient","classical"], phases: ["intro","breakdown"], vibeKeywords: ["silk","flow","soft","wind","dream","fabric"] },
-  { id: "smoke-rise", src: fabricFlowAsset.url, duration: 8, naturalBpm: 70, invertLuma: true, threshold: 0.45, energy: "low", motion: "abstract", archetypes: ["ambient","hiphop"], phases: ["intro","breakdown","groove"], vibeKeywords: ["smoke","haze","chill","lo-fi","drift"] },
-  { id: "birds-flock", src: reachingUpAsset.url, duration: 6, naturalBpm: 110, invertLuma: true, threshold: 0.5, energy: "medium", motion: "abstract", archetypes: ["ambient","classical","house"], phases: ["build","groove"], vibeKeywords: ["birds","free","sky","swarm","nature"] },
-  { id: "city-skyline", src: rainWalkAsset.url, duration: 8, naturalBpm: 90, invertLuma: true, threshold: 0.55, energy: "medium", motion: "slow-drift", archetypes: ["techno","hiphop","house"], phases: ["intro","groove","breakdown"], vibeKeywords: ["city","skyline","urban","night","neon","4am"] },
-  { id: "falling-backward", src: dancerSlowAsset.url, duration: 4, naturalBpm: 140, energy: "high", motion: "slow-drift", archetypes: ["dnb","techno","rock"], phases: ["drop","build"], vibeKeywords: ["fall","gravity","lose","drop","void"] },
+  {
+    id: "dancer-slow",
+    src: dancerSlowAsset.url,
+    duration: 6, naturalBpm: 95,
+    invertLuma: true, threshold: 0.5,
+    energy: "medium", motion: "dancing",
+    archetypes: ["ambient","house","classical","techno","hiphop","pop","dnb","rock"],
+    phases: ["intro","breakdown","groove","build","drop"],
+    vibeKeywords: ["dance","crouch","shadow","light","move","body","fierce","club","energy"],
+  },
+  {
+    id: "rain-walk",
+    src: rainWalkAsset.url,
+    duration: 8, naturalBpm: 85,
+    invertLuma: true, threshold: 0.55,
+    energy: "low", motion: "walking",
+    archetypes: ["ambient","house","hiphop","classical","techno"],
+    phases: ["intro","breakdown","groove"],
+    vibeKeywords: ["rain","night","city","alone","walk","neon","street","4am","urban","cool"],
+  },
+  {
+    id: "fabric-flow",
+    src: fabricFlowAsset.url,
+    duration: 7, naturalBpm: 75,
+    invertLuma: true, threshold: 0.45,
+    energy: "low", motion: "abstract",
+    archetypes: ["ambient","classical","house"],
+    phases: ["intro","breakdown","groove"],
+    vibeKeywords: ["silk","flow","soft","wind","dream","fabric","smoke","haze","drift","spin"],
+  },
+  {
+    id: "reaching-up",
+    src: reachingUpAsset.url,
+    duration: 5, naturalBpm: 95,
+    invertLuma: true, threshold: 0.5,
+    energy: "medium", motion: "slow-drift",
+    archetypes: ["ambient","classical","house","pop","rock"],
+    phases: ["build","groove","breakdown","drop"],
+    vibeKeywords: ["reach","sky","transcend","float","rise","portrait","arm"],
+  },
 ];
 
 export function pickClip(opts: {
@@ -50,7 +79,9 @@ export function pickClip(opts: {
   const energyLevel: ClipTag["energy"] =
     energy > 0.7 ? "explosive" : energy > 0.45 ? "high" : energy > 0.2 ? "medium" : "low";
   const order = ["low", "medium", "high", "explosive"];
-  const scored = CLIPS.filter((c) => c.id !== lastClipId).map((c) => {
+  const candidates = CLIPS.filter((c) => c.id !== lastClipId);
+  const pool = candidates.length ? candidates : CLIPS;
+  const scored = pool.map((c) => {
     let score = 0;
     if (c.archetypes.includes(archetype)) score += 3;
     if (c.phases.includes(phase)) score += 2;

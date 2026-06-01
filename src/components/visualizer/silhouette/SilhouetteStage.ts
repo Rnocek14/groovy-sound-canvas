@@ -27,6 +27,9 @@ export class SilhouetteStage {
   private rimMat: THREE.ShaderMaterial | null = null;
   private haloMat: THREE.ShaderMaterial | null = null;
   private haloPoints: THREE.Points | null = null;
+  private silMesh: THREE.Mesh | null = null;
+  private interiorMesh: THREE.Mesh | null = null;
+  private rimMesh: THREE.Mesh | null = null;
 
   private state: SilhouetteState = "idle";
   private transitionPhase = 0;
@@ -181,7 +184,8 @@ export class SilhouetteStage {
       `,
     });
     const silMesh = new THREE.Mesh(quadGeo.clone(), this.silMat);
-    silMesh.renderOrder = 11; silMesh.frustumCulled = false;
+    silMesh.renderOrder = 11; silMesh.frustumCulled = false; silMesh.visible = false;
+    this.silMesh = silMesh;
     this.overlayScene.add(silMesh);
 
     // Interior — renders only where stencil = 1
@@ -218,7 +222,8 @@ export class SilhouetteStage {
       `,
     });
     const interiorMesh = new THREE.Mesh(quadGeo.clone(), this.interiorMat);
-    interiorMesh.renderOrder = 12; interiorMesh.frustumCulled = false;
+    interiorMesh.renderOrder = 12; interiorMesh.frustumCulled = false; interiorMesh.visible = false;
+    this.interiorMesh = interiorMesh;
     this.overlayScene.add(interiorMesh);
 
     // Rim glow (outside silhouette)
@@ -271,7 +276,8 @@ export class SilhouetteStage {
       `,
     });
     const rimMesh = new THREE.Mesh(quadGeo.clone(), this.rimMat);
-    rimMesh.renderOrder = 13; rimMesh.frustumCulled = false;
+    rimMesh.renderOrder = 13; rimMesh.frustumCulled = false; rimMesh.visible = false;
+    this.rimMesh = rimMesh;
     this.overlayScene.add(rimMesh);
 
     // Halo particles
@@ -439,8 +445,8 @@ export class SilhouetteStage {
 
   update(t: number, dt: number, f: AudioFrame, archetype: string, phase: string, w: number, h: number) {
     if (!this.enabled) { this.intensity += (0 - this.intensity) * Math.min(1, dt * 2); return; }
-    const targetIntensity = this.videoTex && !this.videoFailed ? 1 : 0;
-    this.intensity += (targetIntensity - this.intensity) * Math.min(1, dt * 0.8);
+    // Halo + god-rays ride at full strength even before the video loads.
+    this.intensity += (1 - this.intensity) * Math.min(1, dt * 0.8);
     this.advanceStateMachine(dt, archetype, phase, f.energy);
 
     const evap = this.state === "evaporating" ? this.transitionPhase : 0;
@@ -506,9 +512,14 @@ export class SilhouetteStage {
   }
 
   renderOverlay() {
-    if (!this.enabled || this.intensity < 0.01 || !this.videoTex) return;
-    // Clear stencil buffer for this overlay pass
-    this.renderer.clear(false, false, true);
+    if (!this.enabled || this.intensity < 0.01) return;
+    // God-rays + halo show immediately. Silhouette/interior/rim require the video texture.
+    const hasVideo = !!this.videoTex && !this.videoFailed;
+    if (this.silMesh) this.silMesh.visible = hasVideo;
+    if (this.interiorMesh) this.interiorMesh.visible = hasVideo;
+    if (this.rimMesh) this.rimMesh.visible = hasVideo;
+    // Clear stencil for this overlay pass (the post pass preserved it).
+    this.renderer.clearStencil();
     this.renderer.render(this.overlayScene, this.overlayCamera);
   }
 

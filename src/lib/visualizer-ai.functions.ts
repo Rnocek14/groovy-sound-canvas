@@ -30,7 +30,7 @@ Module ids: tunnel-rings, particle-swarm, ribbon-field, plexus, supershape, star
 Camera behaviors: dolly-forward, slow-orbit, side-track, spin, barrel-roll, free-roam, snap-zoom
 Higher feedback/warp/kaleido during groove/breakdown. Sharper, more chroma/glitch on drop.
 Provide a punchy single-word "word" (uppercase, <=8 chars).
-For clipHint pick one silhouette clip id that fits the moment: dancer-slow, dancer-fierce, fighter-punch, rain-walk, city-walk, spinning-figure, reaching-up, fabric-flow, smoke-rise, birds-flock, city-skyline, falling-backward.`;
+For clipHint pick one silhouette clip id that fits the moment: dancer-slow (dancing/crouched figure, medium energy), rain-walk (lone figure walking through rainy neon city, low energy, intro/breakdown), fabric-flow (soft flowing white fabric, dream/ambient), reaching-up (portrait with raised arm, transcendent/build).`;
 
 export const getVJDirection = createServerFn({ method: "POST" })
   .inputValidator((d: { context: string }) => d)
@@ -69,7 +69,7 @@ export const getVJDirection = createServerFn({ method: "POST" })
                 mood: { type: "string" },
                 word: { type: "string" },
                 narrativeUpdate: { type: "string" },
-                clipHint: { type: "string", description: "Silhouette clip id: dancer-slow, dancer-fierce, fighter-punch, rain-walk, city-walk, spinning-figure, reaching-up, fabric-flow, smoke-rise, birds-flock, city-skyline, falling-backward" },
+                clipHint: { type: "string", description: "Silhouette clip id: dancer-slow, rain-walk, fabric-flow, reaching-up", enum: ["dancer-slow","rain-walk","fabric-flow","reaching-up"] },
               },
               required: ["paletteHex", "feedback", "warp", "chroma", "kaleido", "scanlines", "glitch", "cameraBias", "moduleHints", "mood", "word", "narrativeUpdate", "clipHint"],
             },

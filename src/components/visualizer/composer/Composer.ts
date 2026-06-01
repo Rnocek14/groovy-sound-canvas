@@ -438,7 +438,8 @@ export class Composer {
     this.renderer.render(this.scene, this.camera);
     // post to screen
     this.renderer.setRenderTarget(null);
-    this.renderer.clear(true, true, true);
+    // Clear color + depth, but NOT stencil — silhouette overlay writes stencil for its interior pass.
+    this.renderer.clear(true, true, false);
     this.renderer.render(this.postScene, this.postCamera);
 
     // Silhouette overlay on top of post (uses stencil; samples sceneRT for interior)
