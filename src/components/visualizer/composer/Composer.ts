@@ -308,6 +308,37 @@ export class Composer {
 
   applyDirection(d: AIDirection) { this.events.emit("ai-direction", d); }
 
+  applyVibeConfig(vibe: import("@/lib/vibe/types").VibeConfig) {
+    if (vibe.paletteHex?.length) this.palette.setCustom(vibe.paletteHex);
+    if (vibe.moduleWeights) {
+      this.hintWeights.clear();
+      for (const [id, w] of Object.entries(vibe.moduleWeights)) this.hintWeights.set(id, w);
+    }
+    if (vibe.post) {
+      this.kaleidoT = THREE.MathUtils.clamp(vibe.post.kaleido ?? this.kaleidoT, 0, 1);
+      this.warpT = THREE.MathUtils.clamp(vibe.post.warp ?? this.warpT, 0, 1);
+      this.chromaT = THREE.MathUtils.clamp(vibe.post.chroma ?? this.chromaT, 0, 1);
+      this.scanlinesT = THREE.MathUtils.clamp(vibe.post.scanlines ?? this.scanlinesT, 0, 1);
+      this.glitchT = THREE.MathUtils.clamp(vibe.post.glitch ?? this.glitchT, 0, 1);
+      this.feedbackT = THREE.MathUtils.clamp(vibe.post.feedback ?? this.feedbackT, 0, 0.95);
+    }
+    if (vibe.cameraBias) {
+      const all: CameraBehavior[] = ["dolly-forward","slow-orbit","free-roam","spin","snap-zoom","side-track","barrel-roll"];
+      if (all.includes(vibe.cameraBias as CameraBehavior)) this.cam.pick(vibe.cameraBias as CameraBehavior);
+    }
+    if (vibe.words?.length) {
+      const tb = this.all.find((m) => m.id === "typeburst") as VModule & { setWords?: (w: string[]) => void } | undefined;
+      tb?.setWords?.(vibe.words);
+    }
+    if (vibe.archetypeHint) {
+      const valid: ArchetypeId[] = ["techno","house","ambient","dnb","hiphop","rock","classical","pop"];
+      if ((valid as string[]).includes(vibe.archetypeHint)) {
+        this.arch.setAIArchetype(vibe.archetypeHint as ArchetypeId, 15);
+      }
+    }
+    this.remix(true);
+  }
+
 
   resize(w: number, h: number, dpr: number) {
     this.renderer.setPixelRatio(dpr);
