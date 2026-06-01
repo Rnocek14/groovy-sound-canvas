@@ -57,7 +57,11 @@ function Index() {
     };
   }, []);
 
-  if (!started) return <PermissionGate onReady={(vibe) => { setVibeConfig(vibe); setStarted(true); }} />;
+  if (!started) return <PermissionGate onReady={(vibe) => {
+    setVibeConfig(vibe);
+    if (vibe) setStory({ memory: vibe.narrativeSeed, timeline: [], vibeLabel: vibe.moodLabel });
+    setStarted(true);
+  }} />;
 
   return (
     <div
