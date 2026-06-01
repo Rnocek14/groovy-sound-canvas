@@ -32,6 +32,8 @@ function Index() {
   const [sensitivity, setSensitivity] = useState(1.2);
   const [videoOn, setVideoOn] = useState(true);
   const [uiVisible, setUiVisible] = useState(true);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [story, setStory] = useState<StorySnapshot | null>(null);
   const hideTimer = useRef<number | null>(null);
 
   const bump = () => {
