@@ -11,7 +11,9 @@ import { ARCHETYPES, type ArchetypeId } from "./composer/archetypes";
 import { NarrativeEngine } from "@/lib/vibe/NarrativeEngine";
 import type { VibeConfig } from "@/lib/vibe/types";
 
-export function VisualizerStage({ preset, vibeConfig }: { preset: PresetId; vibeConfig: VibeConfig | null }) {
+export function VisualizerStage({ preset, vibeConfig, onNarrative }: { preset: PresetId; vibeConfig: VibeConfig | null; onNarrative?: (s: { memory: string; timeline: import("@/lib/vibe/types").TimelineEntry[]; lastMood?: string; lastWord?: string }) => void }) {
+  const onNarrativeRef = useRef(onNarrative);
+  onNarrativeRef.current = onNarrative;
   const wrapRef = useRef<HTMLDivElement>(null);
   const presetRef = useRef(preset);
   presetRef.current = preset;
