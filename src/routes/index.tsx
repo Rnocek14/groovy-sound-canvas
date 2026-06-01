@@ -5,6 +5,7 @@ import { VisualizerStage } from "@/components/visualizer/VisualizerStage";
 import { ControlsDock, TopBadge } from "@/components/visualizer/ControlsDock";
 import { MediaTray } from "@/components/visualizer/MediaTray";
 import { VideoBackdrop } from "@/components/visualizer/VideoBackdrop";
+import { StoryOverlay, type StorySnapshot } from "@/components/visualizer/StoryOverlay";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { CameraSource } from "@/components/visualizer/media/CameraSource";
 import type { PresetId } from "@/components/visualizer/presets/types";
@@ -31,6 +32,8 @@ function Index() {
   const [sensitivity, setSensitivity] = useState(1.2);
   const [videoOn, setVideoOn] = useState(true);
   const [uiVisible, setUiVisible] = useState(true);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [story, setStory] = useState<StorySnapshot | null>(null);
   const hideTimer = useRef<number | null>(null);
 
   const bump = () => {
@@ -54,7 +57,11 @@ function Index() {
     };
   }, []);
 
-  if (!started) return <PermissionGate onReady={(vibe) => { setVibeConfig(vibe); setStarted(true); }} />;
+  if (!started) return <PermissionGate onReady={(vibe) => {
+    setVibeConfig(vibe);
+    if (vibe) setStory({ memory: vibe.narrativeSeed, timeline: [], vibeLabel: vibe.moodLabel });
+    setStarted(true);
+  }} />;
 
   return (
     <div
@@ -63,8 +70,31 @@ function Index() {
       onTouchStart={bump}
     >
       <VideoBackdrop enabled={videoOn} />
-      <VisualizerStage preset={preset} vibeConfig={vibeConfig} />
+      <VisualizerStage
+        preset={preset}
+        vibeConfig={vibeConfig}
+        onNarrative={(s) =>
+          setStory({
+            memory: s.memory,
+            timeline: s.timeline,
+            lastMood: s.lastMood,
+            lastWord: s.lastWord,
+            vibeLabel: vibeConfig?.moodLabel ?? null,
+          })
+        }
+      />
       <TopBadge preset={preset} visible={uiVisible} moodLabel={vibeConfig?.moodLabel ?? null} />
+
+      <button
+        onClick={() => { setStoryOpen((v) => !v); bump(); }}
+        className={`pointer-events-auto absolute right-4 top-[max(3rem,calc(env(safe-area-inset-top)+2.5rem))] z-20 rounded-full border px-3 py-1 text-[10px] font-bold tracking-widest backdrop-blur-md transition-opacity duration-300 ${
+          storyOpen ? "border-white bg-white text-black" : "border-white/40 bg-black/40 text-white/80"
+        } ${uiVisible ? "opacity-100" : "opacity-0"}`}
+      >
+        STORY
+      </button>
+
+      <StoryOverlay open={storyOpen} onClose={() => setStoryOpen(false)} snapshot={story} />
 
       <MediaTray visible={uiVisible} />
       <ControlsDock

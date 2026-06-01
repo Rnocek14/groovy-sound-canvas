@@ -76,6 +76,14 @@ export const createTypeBurst: ModuleFactory = ({ scene, palette, events }): VMod
       }
     },
     setWords(words: string[]) { if (words.length) queue = words; },
+    addWord(word: string) {
+      const w = (word || "").trim();
+      if (!w) return;
+      if (!queue.includes(w)) {
+        queue.push(w);
+        if (queue.length > 24) queue = queue.slice(-24);
+      }
+    },
     dispose(){
       offTypeBurst?.(); offDrop?.(); offBeat?.();
       for (const it of items) {
@@ -85,5 +93,5 @@ export const createTypeBurst: ModuleFactory = ({ scene, palette, events }): VMod
       }
       scene.remove(group);
     },
-  } as VModule & { setWords?: (w: string[]) => void };
+  } as VModule & { setWords?: (w: string[]) => void; addWord?: (w: string) => void };
 };
