@@ -26,6 +26,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const [started, setStarted] = useState(false);
+  const [vibeConfig, setVibeConfig] = useState<VibeConfig | null>(null);
   const [preset, setPreset] = useState<PresetId>("tunnel");
   const [sensitivity, setSensitivity] = useState(1.2);
   const [videoOn, setVideoOn] = useState(true);
