@@ -13,6 +13,7 @@ export type AIDirection = {
   mood: string;
   word: string;
   narrativeUpdate: string;
+  clipHint: string;
 };
 
 const SYSTEM = `You are a generative-art VJ director with memory. You receive a JSON context containing:

@@ -380,6 +380,7 @@ export class Composer {
     this.feedbackReady = false;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.silhouette?.setSceneRT(this.sceneRT);
   }
 
   render(t: number, dt: number, f: AudioFrame) {
@@ -440,6 +441,13 @@ export class Composer {
     this.renderer.clear(true, true, true);
     this.renderer.render(this.postScene, this.postCamera);
 
+    // Silhouette overlay on top of post (uses stencil; samples sceneRT for interior)
+    if (this.silhouette) {
+      const arch = this.currentArchetype.id;
+      this.silhouette.update(t, dt, f, arch, f.phase, this.sizeW, this.sizeH);
+      this.silhouette.renderOverlay();
+    }
+
     // capture screen into feedback texture for next frame
     if (this.sizeW > 0 && this.sizeH > 0) {
       this.renderer.copyFramebufferToTexture(this.feedbackTex, new THREE.Vector2(0, 0));
@@ -448,6 +456,9 @@ export class Composer {
   }
 
   dispose() {
+    const halo = this.silhouette?.getHaloPoints();
+    if (halo) this.scene.remove(halo);
+    this.silhouette?.dispose();
     for (const m of this.all) m.dispose();
     this.sceneRT.dispose();
     this.feedbackTex.dispose();
