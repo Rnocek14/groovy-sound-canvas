@@ -27,6 +27,9 @@ export class SilhouetteStage {
   private rimMat: THREE.ShaderMaterial | null = null;
   private haloMat: THREE.ShaderMaterial | null = null;
   private haloPoints: THREE.Points | null = null;
+  private silMesh: THREE.Mesh | null = null;
+  private interiorMesh: THREE.Mesh | null = null;
+  private rimMesh: THREE.Mesh | null = null;
 
   private state: SilhouetteState = "idle";
   private transitionPhase = 0;
