@@ -353,7 +353,8 @@ export class SilhouetteStage {
     this.videoFailed = false;
     this.currentClip = clip;
     const vid = document.createElement("video");
-    vid.src = `/silhouette-clips/${clip.src}`;
+    const isUrl = /^(https?:)?\/\//.test(clip.src) || clip.src.startsWith("/");
+    vid.src = isUrl ? clip.src : `/silhouette-clips/${clip.src}`;
     vid.loop = true; vid.muted = true; vid.playsInline = true; vid.crossOrigin = "anonymous";
     vid.play().catch(() => {});
     vid.addEventListener("error", () => { this.videoFailed = true; }, { once: true });
@@ -361,8 +362,18 @@ export class SilhouetteStage {
       const tex = new THREE.VideoTexture(vid);
       tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
       this.videoTex = tex;
-      if (this.silMat) this.silMat.uniforms.uVideo.value = tex;
-      if (this.rimMat) this.rimMat.uniforms.uVideo.value = tex;
+      const threshold = clip.threshold ?? (clip.invertLuma ? 0.5 : 0.35);
+      const invert = clip.invertLuma ? 1 : 0;
+      if (this.silMat) {
+        this.silMat.uniforms.uVideo.value = tex;
+        this.silMat.uniforms.uThreshold.value = threshold;
+        this.silMat.uniforms.uInvert.value = invert;
+      }
+      if (this.rimMat) {
+        this.rimMat.uniforms.uVideo.value = tex;
+        this.rimMat.uniforms.uThreshold.value = threshold + 0.05;
+        this.rimMat.uniforms.uInvert.value = invert;
+      }
     }, { once: true });
     this.video = vid;
   }
