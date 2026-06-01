@@ -93,5 +93,5 @@ export const createTypeBurst: ModuleFactory = ({ scene, palette, events }): VMod
       }
       scene.remove(group);
     },
-  } as VModule & { setWords?: (w: string[]) => void };
+  } as VModule & { setWords?: (w: string[]) => void; addWord?: (w: string) => void };
 };
