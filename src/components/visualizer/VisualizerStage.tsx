@@ -11,9 +11,11 @@ import { ARCHETYPES, type ArchetypeId } from "./composer/archetypes";
 import { NarrativeEngine } from "@/lib/vibe/NarrativeEngine";
 import type { VibeConfig } from "@/lib/vibe/types";
 
-export function VisualizerStage({ preset, vibeConfig, onNarrative }: { preset: PresetId; vibeConfig: VibeConfig | null; onNarrative?: (s: { memory: string; timeline: import("@/lib/vibe/types").TimelineEntry[]; lastMood?: string; lastWord?: string }) => void }) {
+export function VisualizerStage({ preset, vibeConfig, silhouetteOn = true, onNarrative }: { preset: PresetId; vibeConfig: VibeConfig | null; silhouetteOn?: boolean; onNarrative?: (s: { memory: string; timeline: import("@/lib/vibe/types").TimelineEntry[]; lastMood?: string; lastWord?: string }) => void }) {
   const onNarrativeRef = useRef(onNarrative);
   onNarrativeRef.current = onNarrative;
+  const silhouetteOnRef = useRef(silhouetteOn);
+  silhouetteOnRef.current = silhouetteOn;
   const wrapRef = useRef<HTMLDivElement>(null);
   const presetRef = useRef(preset);
   presetRef.current = preset;
@@ -77,6 +79,8 @@ export function VisualizerStage({ preset, vibeConfig, onNarrative }: { preset: P
             .finally(() => { mediaGenInFlight = false; });
         }
       }
+      composer.initSilhouette(vibeRef.current ?? null);
+      composer.setSilhouetteEnabled(silhouetteOnRef.current);
       resize();
     };
     const resize = () => {
@@ -205,6 +209,10 @@ export function VisualizerStage({ preset, vibeConfig, onNarrative }: { preset: P
       canvas?.remove();
     };
   }, [fetchDirection, fetchArchetype, fetchMedia]);
+
+  useEffect(() => {
+    composerRef.current?.setSilhouetteEnabled(silhouetteOn);
+  }, [silhouetteOn]);
 
   return <div ref={wrapRef} className="absolute inset-0 overflow-hidden" />;
 }

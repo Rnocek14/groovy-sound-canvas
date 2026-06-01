@@ -16,6 +16,8 @@ export function ControlsDock({
   setSensitivity,
   videoOn,
   setVideoOn,
+  silhouetteOn,
+  setSilhouetteOn,
   onExit,
   visible,
 }: {
@@ -25,6 +27,8 @@ export function ControlsDock({
   setSensitivity: (n: number) => void;
   videoOn: boolean;
   setVideoOn: (v: boolean) => void;
+  silhouetteOn: boolean;
+  setSilhouetteOn: (v: boolean) => void;
   onExit: () => void;
   visible: boolean;
 }) {
@@ -71,6 +75,14 @@ export function ControlsDock({
           }`}
         >
           VIDEO
+        </button>
+        <button
+          onClick={() => setSilhouetteOn(!silhouetteOn)}
+          className={`rounded-full border px-3 py-1 text-[10px] font-bold tracking-widest ${
+            silhouetteOn ? "border-white bg-white text-black" : "border-white/40 text-white/70"
+          }`}
+        >
+          FIGURE
         </button>
         <button
           onClick={onExit}

@@ -8,9 +8,11 @@ import { ArchetypeDirector } from "./ArchetypeDirector";
 import { ARCHETYPES, type ArchetypeDef, type ArchetypeId } from "./archetypes";
 import { POOLS } from "./presetPools";
 import { MediaBank } from "../media/MediaBank";
+import { SilhouetteStage } from "../silhouette/SilhouetteStage";
 import type { PresetId } from "../presets/types";
 import type { VModule } from "../modules/types";
 import type { AIDirection } from "@/lib/visualizer-ai.functions";
+import type { VibeConfig } from "@/lib/vibe/types";
 
 export class Composer {
   private renderer: THREE.WebGLRenderer;
@@ -50,9 +52,10 @@ export class Composer {
   private invert = 0;
   private kaleidoSeg = 6;
   private feedbackReady = false;
+  private silhouette: SilhouetteStage | null = null;
 
   constructor(canvas: HTMLCanvasElement, preset: PresetId) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, preserveDrawingBuffer: false });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, preserveDrawingBuffer: false, stencil: true });
     this.renderer.autoClear = false;
     this.pool = POOLS[preset];
     this.renderer.setClearColor(this.pool.bgColor, 1);
@@ -220,13 +223,33 @@ export class Composer {
       this.remix(false);
     }
     if (d.word) this.events.emit("type-burst", d.word);
-    // inject new AI words into TypeBurst queue without wiping vibe-seeded words
     const tb = this.all.find((m) => m.id === "typeburst") as VModule & { addWord?: (w: string) => void } | undefined;
     if (tb?.addWord) {
       if (d.word) tb.addWord(d.word);
       if (d.mood) tb.addWord(d.mood);
     }
+    if (d.clipHint && this.silhouette) this.silhouette.setClipHint(d.clipHint);
   }
+
+  initSilhouette(vibeConfig: VibeConfig | null) {
+    if (this.silhouette) {
+      const oldHalo = this.silhouette.getHaloPoints();
+      if (oldHalo) this.scene.remove(oldHalo);
+      this.silhouette.dispose();
+    }
+    this.silhouette = new SilhouetteStage({
+      renderer: this.renderer,
+      palette: this.palette,
+      events: this.events,
+      barClock: this.arch.barClock,
+      vibeConfig,
+    });
+    this.silhouette.setSceneRT(this.sceneRT);
+    const halo = this.silhouette.getHaloPoints();
+    if (halo) this.scene.add(halo);
+  }
+
+  setSilhouetteEnabled(v: boolean) { this.silhouette?.setEnabled(v); }
 
   private remix(initial: boolean) {
     // Camera (when live) is a persistent background layer — not subject to remix.
@@ -357,6 +380,7 @@ export class Composer {
     this.feedbackReady = false;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.silhouette?.setSceneRT(this.sceneRT);
   }
 
   render(t: number, dt: number, f: AudioFrame) {
@@ -417,6 +441,13 @@ export class Composer {
     this.renderer.clear(true, true, true);
     this.renderer.render(this.postScene, this.postCamera);
 
+    // Silhouette overlay on top of post (uses stencil; samples sceneRT for interior)
+    if (this.silhouette) {
+      const arch = this.currentArchetype.id;
+      this.silhouette.update(t, dt, f, arch, f.phase, this.sizeW, this.sizeH);
+      this.silhouette.renderOverlay();
+    }
+
     // capture screen into feedback texture for next frame
     if (this.sizeW > 0 && this.sizeH > 0) {
       this.renderer.copyFramebufferToTexture(this.feedbackTex, new THREE.Vector2(0, 0));
@@ -425,6 +456,9 @@ export class Composer {
   }
 
   dispose() {
+    const halo = this.silhouette?.getHaloPoints();
+    if (halo) this.scene.remove(halo);
+    this.silhouette?.dispose();
     for (const m of this.all) m.dispose();
     this.sceneRT.dispose();
     this.feedbackTex.dispose();

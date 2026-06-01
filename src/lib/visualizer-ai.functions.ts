@@ -13,6 +13,7 @@ export type AIDirection = {
   mood: string;
   word: string;
   narrativeUpdate: string;
+  clipHint: string;
 };
 
 const SYSTEM = `You are a generative-art VJ director with memory. You receive a JSON context containing:
@@ -28,7 +29,8 @@ After choosing your direction, write a narrativeUpdate: 1-2 sentences describing
 Module ids: tunnel-rings, particle-swarm, ribbon-field, plexus, supershape, starfield, neon-grid, wormhole, bouncing-geo, ring-burst, fluid-shader, meta-balls, typeburst
 Camera behaviors: dolly-forward, slow-orbit, side-track, spin, barrel-roll, free-roam, snap-zoom
 Higher feedback/warp/kaleido during groove/breakdown. Sharper, more chroma/glitch on drop.
-Provide a punchy single-word "word" (uppercase, <=8 chars).`;
+Provide a punchy single-word "word" (uppercase, <=8 chars).
+For clipHint pick one silhouette clip id that fits the moment: dancer-slow, dancer-fierce, fighter-punch, rain-walk, city-walk, spinning-figure, reaching-up, fabric-flow, smoke-rise, birds-flock, city-skyline, falling-backward.`;
 
 export const getVJDirection = createServerFn({ method: "POST" })
   .inputValidator((d: { context: string }) => d)
@@ -67,8 +69,9 @@ export const getVJDirection = createServerFn({ method: "POST" })
                 mood: { type: "string" },
                 word: { type: "string" },
                 narrativeUpdate: { type: "string" },
+                clipHint: { type: "string", description: "Silhouette clip id: dancer-slow, dancer-fierce, fighter-punch, rain-walk, city-walk, spinning-figure, reaching-up, fabric-flow, smoke-rise, birds-flock, city-skyline, falling-backward" },
               },
-              required: ["paletteHex", "feedback", "warp", "chroma", "kaleido", "scanlines", "glitch", "cameraBias", "moduleHints", "mood", "word", "narrativeUpdate"],
+              required: ["paletteHex", "feedback", "warp", "chroma", "kaleido", "scanlines", "glitch", "cameraBias", "moduleHints", "mood", "word", "narrativeUpdate", "clipHint"],
             },
           },
         }],
