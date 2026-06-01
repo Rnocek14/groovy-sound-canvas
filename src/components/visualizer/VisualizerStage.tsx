@@ -103,6 +103,12 @@ export function VisualizerStage({ preset, vibeConfig, onNarrative }: { preset: P
           now,
           `AI: ${direction.mood ?? ""} ${direction.word ?? ""}`.trim(),
         );
+        onNarrativeRef.current?.({
+          memory: narrativeRef.current.memory,
+          timeline: narrativeRef.current.timeline.slice(),
+          lastMood: direction.mood,
+          lastWord: direction.word,
+        });
       } catch (e) {
         console.debug("[VJ-AI]", e);
       } finally {
