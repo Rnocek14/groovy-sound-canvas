@@ -1,41 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
 
 export type AIDirection = {
-  paletteHex: string[];       // 4 hex colors
-  feedback: number;           // 0..1 feedback echo strength
-  warp: number;               // 0..1
-  chroma: number;             // 0..1
-  kaleido: number;            // 0..1
-  scanlines: number;          // 0..1
-  glitch: number;             // 0..1
-  cameraBias: string;         // one of dolly-forward|slow-orbit|side-track|spin|barrel-roll|free-roam|snap-zoom
-  moduleHints: string[];      // module ids to favor: tunnel, particles, ribbons, plexus, supershape, starfield, neongrid, wormhole, bouncinggeo, ringburst, fluid, metaballs, typeburst
-  mood: string;               // 1-3 word vibe label
-  word: string;               // one-word kinetic typography burst to flash
+  paletteHex: string[];
+  feedback: number;
+  warp: number;
+  chroma: number;
+  kaleido: number;
+  scanlines: number;
+  glitch: number;
+  cameraBias: string;
+  moduleHints: string[];
+  mood: string;
+  word: string;
+  narrativeUpdate: string;
 };
 
-type Features = {
-  preset: string;
-  phase: string;
-  bpm: number;
-  energy: number;
-  short: number;
-  bass: number;
-  mid: number;
-  treble: number;
-  flux: number;
-  dropsLastMin: number;
-  elapsed: number;
-};
+const SYSTEM = `You are a generative-art VJ director with memory. You receive a JSON context containing:
+- vibePrompt: the mood the user set at the start
+- memory: a running narrative of how the session has evolved so far
+- recentEvents: the last 8 significant moments (drops, archetype changes, your last directions)
+- current audio features (phase, bpm, energy, bass/mid/treble, flux)
 
-const SYSTEM = `You are a generative-art VJ director. Given live audio features, output a JSON visual direction for a real-time WebGL visualizer. Be bold, varied, music-genre aware. Match palette and intensity to the song phase (intro/build/drop/groove/breakdown). Pick 2-4 module hints from: tunnel, particles, ribbons, plexus, supershape, starfield, neongrid, wormhole, bouncinggeo, ringburst, fluid, metaballs, typeburst. Pick cameraBias from: dolly-forward, slow-orbit, side-track, spin, barrel-roll, free-roam, snap-zoom. Output 4 distinct vivid hex colors. Higher feedback/warp/kaleido during groove/breakdown; sharper, cleaner, more chroma/glitch on drop. Provide a punchy single-word "word" to flash as kinetic typography (uppercase, <= 8 chars).`;
+Your job: direct the visuals in a way that honors the original vibe, responds to the current music, AND builds on what has already happened. Create arc, tension, and resolution across the session. Don't repeat yourself — evolve from what's been done.
+
+After choosing your direction, write a narrativeUpdate: 1-2 sentences describing what you just chose and where the session arc is heading next. This becomes part of memory for next time.
+
+Module ids: tunnel-rings, particle-swarm, ribbon-field, plexus, supershape, starfield, neon-grid, wormhole, bouncing-geo, ring-burst, fluid-shader, meta-balls, typeburst
+Camera behaviors: dolly-forward, slow-orbit, side-track, spin, barrel-roll, free-roam, snap-zoom
+Higher feedback/warp/kaleido during groove/breakdown. Sharper, more chroma/glitch on drop.
+Provide a punchy single-word "word" (uppercase, <=8 chars).`;
 
 export const getVJDirection = createServerFn({ method: "POST" })
-  .inputValidator((d: Features) => d)
+  .inputValidator((d: { context: string }) => d)
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
-    const prompt = `Features: ${JSON.stringify(data)}. Respond with the JSON only.`;
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -46,7 +45,7 @@ export const getVJDirection = createServerFn({ method: "POST" })
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM },
-          { role: "user", content: prompt },
+          { role: "user", content: `Context: ${data.context}\n\nReturn the JSON only.` },
         ],
         tools: [{
           type: "function",
@@ -67,8 +66,9 @@ export const getVJDirection = createServerFn({ method: "POST" })
                 moduleHints: { type: "array", items: { type: "string" } },
                 mood: { type: "string" },
                 word: { type: "string" },
+                narrativeUpdate: { type: "string" },
               },
-              required: ["paletteHex", "feedback", "warp", "chroma", "kaleido", "scanlines", "glitch", "cameraBias", "moduleHints", "mood", "word"],
+              required: ["paletteHex", "feedback", "warp", "chroma", "kaleido", "scanlines", "glitch", "cameraBias", "moduleHints", "mood", "word", "narrativeUpdate"],
             },
           },
         }],
