@@ -220,9 +220,12 @@ export class Composer {
       this.remix(false);
     }
     if (d.word) this.events.emit("type-burst", d.word);
-    // also push word list to TypeBurst if present
-    const tb = this.all.find((m) => m.id === "typeburst") as VModule & { setWords?: (w: string[]) => void } | undefined;
-    if (tb?.setWords && d.mood) tb.setWords([d.mood, ...(d.word ? [d.word] : [])]);
+    // inject new AI words into TypeBurst queue without wiping vibe-seeded words
+    const tb = this.all.find((m) => m.id === "typeburst") as VModule & { addWord?: (w: string) => void } | undefined;
+    if (tb?.addWord) {
+      if (d.word) tb.addWord(d.word);
+      if (d.mood) tb.addWord(d.mood);
+    }
   }
 
   private remix(initial: boolean) {
