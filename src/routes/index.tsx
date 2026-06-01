@@ -54,7 +54,7 @@ function Index() {
     };
   }, []);
 
-  if (!started) return <PermissionGate onReady={() => setStarted(true)} />;
+  if (!started) return <PermissionGate onReady={(vibe) => { setVibeConfig(vibe); setStarted(true); }} />;
 
   return (
     <div
@@ -63,8 +63,9 @@ function Index() {
       onTouchStart={bump}
     >
       <VideoBackdrop enabled={videoOn} />
-      <VisualizerStage preset={preset} />
-      <TopBadge preset={preset} visible={uiVisible} />
+      <VisualizerStage preset={preset} vibeConfig={vibeConfig} />
+      <TopBadge preset={preset} visible={uiVisible} moodLabel={vibeConfig?.moodLabel ?? null} />
+
       <MediaTray visible={uiVisible} />
       <ControlsDock
         preset={preset}

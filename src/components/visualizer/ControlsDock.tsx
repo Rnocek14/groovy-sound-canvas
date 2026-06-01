@@ -83,7 +83,7 @@ export function ControlsDock({
   );
 }
 
-export function TopBadge({ preset, visible }: { preset: PresetId; visible: boolean }) {
+export function TopBadge({ preset, visible, moodLabel }: { preset: PresetId; visible: boolean; moodLabel?: string | null }) {
   const [beats, setBeats] = useState(0);
   useEffect(() => {
     let raf = 0;
@@ -107,7 +107,7 @@ export function TopBadge({ preset, visible }: { preset: PresetId; visible: boole
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
-      <span>● LIVE · {preset.toUpperCase()}</span>
+      <span>● LIVE · {moodLabel ?? preset.toUpperCase()}</span>
       <span>BEATS {beats}</span>
     </div>
   );
