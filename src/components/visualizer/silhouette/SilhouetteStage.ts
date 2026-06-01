@@ -227,6 +227,7 @@ export class SilhouetteStage {
       stencilWrite: false, stencilFunc: THREE.NotEqualStencilFunc, stencilRef: 1,
       uniforms: {
         uVideo: { value: null }, uThreshold: { value: 0.4 },
+        uInvert: { value: 0 },
         uColor: { value: new THREE.Color() },
         uIntensity: { value: 0 }, uBass: { value: 0 },
         uEvaporate: { value: 0 }, uPrecipitate: { value: 0 },
@@ -238,7 +239,7 @@ export class SilhouetteStage {
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uVideo;
-        uniform float uThreshold, uRimWidth, uIntensity, uBass, uTime, uAspect, uFigureScale;
+        uniform float uThreshold, uInvert, uRimWidth, uIntensity, uBass, uTime, uAspect, uFigureScale;
         uniform float uEvaporate, uPrecipitate;
         uniform vec3 uColor;
         void main(){
@@ -255,7 +256,8 @@ export class SilhouetteStage {
               vec2 offset = vec2(float(dx), float(dy)) * uRimWidth * 0.5;
               vec4 s = texture2D(uVideo, clamp(clamped + offset, 0.0, 1.0));
               float lum = dot(s.rgb, vec3(0.299, 0.587, 0.114));
-              if(lum < uThreshold) rimVal += 1.0;
+              bool inFig = uInvert > 0.5 ? lum > uThreshold : lum < uThreshold;
+              if(inFig) rimVal += 1.0;
             }
           }
           rimVal /= 24.0;
