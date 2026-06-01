@@ -182,14 +182,16 @@ export class SilhouetteStage {
       uniforms: {
         uScene: { value: null },
         uIntensity: { value: 1 }, uTime: { value: 0 }, uBass: { value: 0 },
-        uBrightness: { value: 1.2 }, uHueShift: { value: 0 },
+        uBrightness: { value: 2.6 }, uHueShift: { value: 0 }, uSaturation: { value: 1.7 },
+        uTint: { value: new THREE.Color(0xffffff) },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
       fragmentShader: `
         precision highp float;
         varying vec2 vUv;
         uniform sampler2D uScene;
-        uniform float uIntensity, uBass, uBrightness, uHueShift;
+        uniform float uIntensity, uBass, uBrightness, uHueShift, uSaturation;
+        uniform vec3 uTint;
         vec3 hueShift(vec3 col, float shift){
           float angle = shift * 6.28318;
           float s = sin(angle), c = cos(angle);
@@ -201,9 +203,15 @@ export class SilhouetteStage {
           return clamp(m * col, 0.0, 4.0);
         }
         void main(){
-          vec4 scene = texture2D(uScene, vUv);
-          vec3 col = scene.rgb * uBrightness;
-          col = hueShift(col, uHueShift + uBass * 0.05);
+          // Sample scene with slight zoom so the inside reveals more of the universe.
+          vec2 uv = (vUv - 0.5) * 0.85 + 0.5;
+          vec3 scene = texture2D(uScene, uv).rgb;
+          // Saturation boost
+          float lum = dot(scene, vec3(0.299, 0.587, 0.114));
+          scene = mix(vec3(lum), scene, uSaturation);
+          vec3 col = scene * uBrightness * (1.0 + uBass * 0.6);
+          col = hueShift(col, uHueShift + uBass * 0.08);
+          col *= uTint;
           gl_FragColor = vec4(col * uIntensity, 1.0);
         }
       `,
