@@ -284,9 +284,10 @@ export class Composer {
 
   private remix(initial: boolean) {
     // Camera (when live) is a persistent background layer — not subject to remix.
+    // Waveform is always-on top overlay (Milkdrop-style legibility).
     const camLive = MediaBank.hasCamera();
     const weighted = this.all
-      .filter((m) => m.id !== "camera-echo")
+      .filter((m) => m.id !== "camera-echo" && m.id !== "waveform")
       .map((m) => {
         const base = this.hintWeights.get(m.id) ?? 1;
         return { m, w: base * (0.5 + Math.random()) };
@@ -297,7 +298,6 @@ export class Composer {
     const layers = new Set<string>();
     for (const { m } of weighted) {
       if (pick.length >= target) break;
-      // When camera is live it owns the bg layer — allow other bg modules to be skipped more
       if (layers.has(m.layer) && Math.random() < 0.35) continue;
       if (camLive && m.layer === "bg" && Math.random() < 0.6) continue;
       pick.push(m);
@@ -314,8 +314,9 @@ export class Composer {
     const activeIds = new Set(pick.map((m) => m.id));
     this.active_target.clear();
     for (const m of this.all) this.active_target.set(m.id, activeIds.has(m.id) ? 1 : 0);
-    // Pin camera-echo on whenever camera stream is live
     if (camLive) this.active_target.set("camera-echo", 1);
+    // Always-on waveform overlay
+    this.active_target.set("waveform", 1);
 
     this.cam.pick();
     if (!initial) {
