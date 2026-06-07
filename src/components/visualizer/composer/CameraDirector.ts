@@ -23,6 +23,7 @@ export class CameraDirector {
   private kick = 0; // 0..1 short impulse (snap zoom / barrel)
   private kickKind: "zoom" | "roll" = "zoom";
   private rollPhase = 0;
+  private driftPhase = 0;
 
   constructor(camera: THREE.PerspectiveCamera, bias?: CameraBehavior[]) {
     this.camera = camera;
@@ -40,6 +41,8 @@ export class CameraDirector {
     if (kind === "roll") this.rollPhase = 0;
   }
   update(t: number, dt: number, f: AudioFrame) {
+    this.driftPhase += dt * (0.08 + f.level * 0.5 + f.bass * 0.8);
+    const mt = this.driftPhase;
     if (this.mix < 1) {
       this.mix = Math.min(1, this.mix + dt * 1.2);
       if (this.mix >= 1) this.cur = this.next;
@@ -55,51 +58,51 @@ export class CameraDirector {
     const apply = (b: CameraBehavior, out: THREE.Vector3, look: THREE.Vector3, fovBox: { v: number }, rzBox: { v: number }) => {
       switch (b) {
         case "dolly-forward":
-          out.set(Math.sin(t * 0.43) * 0.5, Math.cos(t * 0.31) * 0.4, 4 - f.bass * 0.8);
+          out.set(Math.sin(mt * 0.43) * 0.5, Math.cos(mt * 0.31) * 0.4, 4 - f.bass * 1.1);
           look.set(0, 0, -10);
           fovBox.v = 70 + f.bass * 12;
-          rzBox.v = Math.sin(t * 0.2) * 0.08;
+          rzBox.v = Math.sin(mt * 0.2) * 0.05;
           break;
         case "slow-orbit": {
           const r = 5;
-          const a = t * 0.18;
-          out.set(Math.sin(a) * r, Math.sin(t * 0.12) * 1.2, Math.cos(a) * r);
+          const a = mt * 0.18;
+          out.set(Math.sin(a) * r, Math.sin(mt * 0.12) * 1.2, Math.cos(a) * r);
           look.set(0, 0, 0);
           fovBox.v = 55 + f.bass * 8;
-          rzBox.v = Math.sin(t * 0.1) * 0.04;
+          rzBox.v = Math.sin(mt * 0.1) * 0.03;
           break;
         }
         case "free-roam":
-          out.set(Math.sin(t * 0.27) * 3 + Math.sin(t * 0.91) * 1.2,
-                  Math.cos(t * 0.31) * 2 + Math.cos(t * 0.71) * 0.8,
-                  3 + Math.sin(t * 0.13) * 2);
-          look.set(Math.sin(t * 0.5) * 1.5, 0, -2);
-          fovBox.v = 65 + Math.sin(t * 0.4) * 8;
-          rzBox.v = Math.sin(t * 0.3) * 0.12;
+          out.set(Math.sin(mt * 0.27) * 3 + Math.sin(mt * 0.91) * 1.2,
+                  Math.cos(mt * 0.31) * 2 + Math.cos(mt * 0.71) * 0.8,
+                  3 + Math.sin(mt * 0.13) * 2);
+          look.set(Math.sin(mt * 0.5) * 1.5, 0, -2);
+          fovBox.v = 65 + Math.sin(mt * 0.4) * 5 + f.bass * 5;
+          rzBox.v = Math.sin(mt * 0.3) * 0.08;
           break;
         case "spin":
-          out.set(Math.sin(t * 0.6) * 3, Math.cos(t * 0.5) * 2, 5);
+          out.set(Math.sin(mt * 0.6) * 3, Math.cos(mt * 0.5) * 2, 5);
           look.set(0, 0, 0);
           fovBox.v = 75;
-          rzBox.v = t * 0.6;
+          rzBox.v = mt * 0.45;
           break;
         case "snap-zoom":
           out.set(0, 0, 6.5 - f.level * 1.5);
           look.set(0, 0, 0);
           fovBox.v = 60 - f.bass * 18;
-          rzBox.v = Math.sin(t * 0.4) * 0.05;
+          rzBox.v = Math.sin(mt * 0.4) * 0.04;
           break;
         case "side-track":
-          out.set(Math.sin(t * 0.4) * 4, 0.5, 4.5);
-          look.set(Math.cos(t * 0.4) * 1.5, 0, -2);
+          out.set(Math.sin(mt * 0.4) * 4, 0.5, 4.5);
+          look.set(Math.cos(mt * 0.4) * 1.5, 0, -2);
           fovBox.v = 75;
-          rzBox.v = Math.sin(t * 0.6) * 0.1;
+          rzBox.v = Math.sin(mt * 0.6) * 0.07;
           break;
         case "barrel-roll":
           out.set(0, 0, 5);
           look.set(0, 0, 0);
           fovBox.v = 80;
-          rzBox.v = t * 1.2;
+          rzBox.v = mt * 0.7;
           break;
       }
     };

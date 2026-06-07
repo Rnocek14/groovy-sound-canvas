@@ -44,24 +44,29 @@ export const createTunnelRings: ModuleFactory = ({ scene, palette, events }) => 
 
   let intensity = 0;
   let speedBoost = 0;
-  const off = events.on("beat", () => { speedBoost = Math.min(2, speedBoost + 0.4); });
+  let tunnelSpeed = 0;
+  let motionPhase = 0;
+  const off = events.on("beat", () => { speedBoost = Math.min(1.4, speedBoost + 0.7); });
 
   return {
     id: "tunnel-rings",
     layer: "mid",
     setIntensity(v) { intensity = v; group.visible = v > 0.02; },
     update(t, dt, f) {
-      const speed = (5 + f.level * 14 + f.bass * 12) * (1 + speedBoost);
-      speedBoost *= Math.pow(0.001, dt);
+      const targetSpeed = 0.25 + f.level * 7 + f.bass * 22 + f.flux * 12 + speedBoost * 14;
+      const follow = 1 - Math.pow(0.001, dt * 7);
+      tunnelSpeed += (targetSpeed - tunnelSpeed) * follow;
+      motionPhase += dt * (0.18 + f.mid * 1.4 + f.bass * 2.2 + speedBoost * 1.5);
+      speedBoost *= Math.pow(0.0001, dt);
       for (let i = 0; i < meshes.length; i++) {
         const m = meshes[i];
-        m.position.z += speed * dt;
+        m.position.z += tunnelSpeed * dt;
         if (m.position.z > 2) m.position.z -= RING_COUNT * RING_SPACING;
         const u = mats[i].uniforms;
-        u.uTime.value = t; u.uBass.value = f.bass; u.uMid.value = f.mid;
+        u.uTime.value = motionPhase; u.uBass.value = f.bass; u.uMid.value = f.mid;
         (u.uColor.value as THREE.Color).copy(palette.get(i % 4, m.position.z * 0.005));
         u.uOpacity.value = intensity;
-        m.rotation.z = t * 0.3 + i * 0.07;
+        m.rotation.z = motionPhase * 0.45 + i * 0.07;
       }
     },
     dispose() {

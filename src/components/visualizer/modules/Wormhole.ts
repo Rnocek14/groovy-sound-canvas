@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { ModuleFactory } from "./types";
 
-export const createWormhole: ModuleFactory = ({ scene, palette }) => {
+export const createWormhole: ModuleFactory = ({ scene, palette, events }) => {
   const geo = new THREE.CylinderGeometry(2.5, 2.5, 60, 24, 1, true);
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, transparent: true,
@@ -28,18 +28,23 @@ export const createWormhole: ModuleFactory = ({ scene, palette }) => {
   mesh.position.z = -25;
   scene.add(mesh);
   let intensity = 0;
+  let audioPhase = 0;
+  let beatPush = 0;
+  const off = events.on("beat", () => { beatPush = Math.min(1.2, beatPush + 0.75); });
   return {
     id: "wormhole",
     layer: "bg",
     setIntensity(v) { intensity = v; mesh.visible = v > 0.02; },
-    update(t, _dt, f) {
-      mat.uniforms.uTime.value = t;
+    update(t, dt, f) {
+      audioPhase += dt * (0.04 + f.level * 2.2 + f.bass * 4.8 + f.flux * 2.5 + beatPush * 3.5);
+      beatPush *= Math.pow(0.0001, dt);
+      mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uBass.value = f.bass;
       mat.uniforms.uOpacity.value = intensity;
       (mat.uniforms.uColorA.value as THREE.Color).copy(palette.get(0));
       (mat.uniforms.uColorB.value as THREE.Color).copy(palette.get(1));
-      mesh.position.z = -25 + Math.sin(t * 0.3) * 3;
+      mesh.position.z = -25 + Math.sin(t * 0.12) * 0.8 - beatPush * 1.5;
     },
-    dispose() { geo.dispose(); mat.dispose(); scene.remove(mesh); },
+    dispose() { off(); geo.dispose(); mat.dispose(); scene.remove(mesh); },
   };
 };
