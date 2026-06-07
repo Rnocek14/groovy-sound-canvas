@@ -12,6 +12,7 @@ import { createWormhole } from "../modules/Wormhole";
 import { createFluidShader } from "../modules/FluidShader";
 import { createMetaBalls } from "../modules/MetaBalls";
 import { createTypeBurst } from "../modules/TypeBurst";
+import { createWaveform } from "../modules/Waveform";
 import { createMediaKaleido } from "../modules/media/MediaKaleido";
 import { createSlitScan } from "../modules/media/SlitScan";
 import { createCollageStrobe } from "../modules/media/CollageStrobe";
@@ -39,6 +40,7 @@ const ALL: ModuleFactory[] = [
   createTunnelRings, createWormhole, createNeonGrid, createStarfield,
   createParticleSwarm, createRingBurst, createBouncingGeo, createRibbonField,
   createPlexus, createSupershape, createFluidShader, createMetaBalls, createTypeBurst,
+  createWaveform,
   createMediaKaleido, createSlitScan, createCollageStrobe, createCameraEcho,
 ];
 

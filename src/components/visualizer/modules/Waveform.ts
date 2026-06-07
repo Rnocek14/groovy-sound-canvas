@@ -83,9 +83,10 @@ export const createWaveform: ModuleFactory = ({ scene, palette }) => {
       lp.needsUpdate = true;
 
       // Color from palette, brightness pulses on beat
-      const c = palette.getCurrent()[0] ?? 0xffffff;
-      ringMat.color.setHex(c);
-      lineMat.color.setHex(palette.getCurrent()[1] ?? c);
+      const c0 = palette.get(0).getHex();
+      const c1 = palette.get(1).getHex();
+      ringMat.color.setHex(c0);
+      lineMat.color.setHex(c1);
       ringMat.opacity = (0.6 + (f.bassTransient ?? 0) * 0.5) * intensity;
       lineMat.opacity = (0.5 + f.level * 0.4) * intensity;
     },
