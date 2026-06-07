@@ -27,6 +27,15 @@ export class AudioEngine {
   source: MediaStreamAudioSourceNode | null = null;
   fft!: Uint8Array<ArrayBuffer>;
   time!: Uint8Array<ArrayBuffer>;
+  private lastFrame: AudioFrame = {
+    fft: new Uint8Array(0),
+    time: new Uint8Array(0),
+    bass: 0, mid: 0, treble: 0, level: 0,
+    beat: false, sinceBeat: 999, drop: false,
+    energy: 0, flux: 0,
+    phase: "intro", shortEnergy: 0, bpm: 0,
+    centroid: 0, percuss: 0, bassToTreble: 1,
+  };
 
   // EMAs
   private bassEMA = 0;
@@ -57,7 +66,11 @@ export class AudioEngine {
   private phase: SongPhase = "intro";
   private startedAt = 0;
 
-  sensitivity = 1;
+  sensitivity = 1.9;
+
+  getLastFrame() {
+    return this.lastFrame;
+  }
 
   async start(streamIn?: MediaStream) {
     if (this.ctx) return;
@@ -99,7 +112,7 @@ export class AudioEngine {
   read(now: number): AudioFrame {
     const a = this.analyser;
     if (!a) {
-      return {
+      this.lastFrame = {
         fft: new Uint8Array(0),
         time: new Uint8Array(0),
         bass: 0, mid: 0, treble: 0, level: 0,
@@ -108,6 +121,7 @@ export class AudioEngine {
         phase: "intro", shortEnergy: 0, bpm: 0,
         centroid: 0, percuss: 0, bassToTreble: 1,
       };
+      return this.lastFrame;
     }
     if (!this.startedAt) this.startedAt = now;
     a.getByteFrequencyData(this.fft);
@@ -241,7 +255,7 @@ export class AudioEngine {
     else if (this.shortLevelEMA > this.energyLongEMA * 1.18 && this.shortLevelEMA > lMean * 1.1) phase = "build";
     this.phase = phase;
 
-    return {
+    this.lastFrame = {
       fft: this.fft,
       time: this.time,
       bass: this.bassEMA,
@@ -258,6 +272,7 @@ export class AudioEngine {
       percuss: this.percussEMA,
       bassToTreble: Math.max(0.1, Math.min(10, btr)),
     };
+    return this.lastFrame;
   }
 }
 

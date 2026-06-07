@@ -102,8 +102,8 @@ export function TopBadge({ preset, visible, moodLabel }: { preset: PresetId; vis
     let last = 0;
     const tick = () => {
       const now = performance.now() / 1000;
-      const f = audioEngine.read(now);
-      if (f.beat) {
+      const f = audioEngine.getLastFrame();
+      if (f.beat && now - last > 0.12) {
         setBeats((b) => b + 1);
         last = now;
       }
