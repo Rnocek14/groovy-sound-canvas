@@ -35,15 +35,16 @@ export const createWormhole: ModuleFactory = ({ scene, palette, events }) => {
     id: "wormhole",
     layer: "bg",
     setIntensity(v) { intensity = v; mesh.visible = v > 0.02; },
-    update(t, dt, f) {
-      audioPhase += dt * (0.04 + f.level * 2.2 + f.bass * 4.8 + f.flux * 2.5 + beatPush * 3.5);
-      beatPush *= Math.pow(0.0001, dt);
+    update(_t, dt, f) {
+      const energyGate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.bass * 3.0 + beatPush * 3.0 + f.flux * 1.2) * energyGate;
+      beatPush *= Math.pow(0.001, dt);
       mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uBass.value = f.bass;
       mat.uniforms.uOpacity.value = intensity;
       (mat.uniforms.uColorA.value as THREE.Color).copy(palette.get(0));
       (mat.uniforms.uColorB.value as THREE.Color).copy(palette.get(1));
-      mesh.position.z = -25 + Math.sin(t * 0.12) * 0.8 - beatPush * 1.5;
+      mesh.position.z = -25 - beatPush * 1.2;
     },
     dispose() { off(); geo.dispose(); mat.dispose(); scene.remove(mesh); },
   };
