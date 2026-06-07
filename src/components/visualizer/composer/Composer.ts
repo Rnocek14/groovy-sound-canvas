@@ -50,6 +50,7 @@ export class Composer {
   private feedback = 0.6; private feedbackT = 0.6;
   private flash = 0;
   private invert = 0;
+  private feedbackPulse = 0;
   private kaleidoSeg = 6;
   private feedbackReady = false;
   private silhouette: SilhouetteStage | null = null;
@@ -415,6 +416,9 @@ export class Composer {
     // decay one-shots
     this.flash *= Math.pow(0.001, dt);
     this.invert *= Math.pow(0.0001, dt);
+    if (f.beat) this.feedbackPulse = Math.max(this.feedbackPulse, 0.8);
+    if (f.drop) this.feedbackPulse = 1.4;
+    this.feedbackPulse *= Math.pow(0.0001, dt);
 
     const u = this.postMat.uniforms;
     u.uTime.value = t;
@@ -429,8 +433,8 @@ export class Composer {
     u.uBass.value = f.bass;
     u.uFeedback.value = this.feedback;
     u.uFbReady.value = this.feedbackReady ? 1 : 0;
-    u.uFbZoom.value = 0.004 + f.bass * 0.008 + (f.drop ? 0.02 : 0);
-    u.uFbRot.value = 0.0008 + Math.sin(t * 0.13) * 0.001 + f.treble * 0.0015;
+    u.uFbZoom.value = f.level * 0.002 + f.bass * 0.01 + this.feedbackPulse * 0.01;
+    u.uFbRot.value = (f.treble - 0.2) * 0.0012 + this.feedbackPulse * 0.0008;
 
     // render scene to sceneRT
     this.renderer.setRenderTarget(this.sceneRT);
