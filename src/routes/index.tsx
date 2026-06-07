@@ -29,7 +29,7 @@ function Index() {
   const [started, setStarted] = useState(false);
   const [vibeConfig, setVibeConfig] = useState<VibeConfig | null>(null);
   const [preset, setPreset] = useState<PresetId>("tunnel");
-  const [sensitivity, setSensitivity] = useState(1.2);
+  const [sensitivity, setSensitivity] = useState(1.9);
   const [videoOn, setVideoOn] = useState(true);
   const [silhouetteOn, setSilhouetteOn] = useState(false);
   const [uiVisible, setUiVisible] = useState(true);
