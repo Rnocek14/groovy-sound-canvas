@@ -53,6 +53,7 @@ export class Composer {
   private feedbackPulse = 0;
   private kaleidoSeg = 6;
   private feedbackReady = false;
+  private _ppPhase = 0;
   private silhouette: SilhouetteStage | null = null;
 
   constructor(canvas: HTMLCanvasElement, preset: PresetId) {
