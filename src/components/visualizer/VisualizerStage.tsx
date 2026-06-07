@@ -35,13 +35,7 @@ export function VisualizerStage({ preset, vibeConfig, silhouetteOn = true, onNar
     let active: PresetId | null = null;
     let raf = 0;
     let last = performance.now() / 1000;
-    let lastFrame: AudioFrame = {
-      fft: new Uint8Array(), time: new Uint8Array(),
-      bass: 0, mid: 0, treble: 0, level: 0,
-      beat: false, sinceBeat: 999, drop: false, energy: 0, flux: 0,
-      phase: "intro", shortEnergy: 0, bpm: 0,
-      centroid: 0, percuss: 0, bassToTreble: 1,
-    };
+    let lastFrame: AudioFrame = audioEngine.getLastFrame();
     let prevPhase = "intro";
     let dropsInWindow: number[] = [];
     let lastAICall = -10;
