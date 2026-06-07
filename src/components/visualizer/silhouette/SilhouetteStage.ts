@@ -182,7 +182,7 @@ export class SilhouetteStage {
       uniforms: {
         uScene: { value: null },
         uIntensity: { value: 1 }, uTime: { value: 0 }, uBass: { value: 0 },
-        uBrightness: { value: 2.6 }, uHueShift: { value: 0 }, uSaturation: { value: 1.7 },
+        uBrightness: { value: 1.4 }, uHueShift: { value: 0 }, uSaturation: { value: 1.25 },
         uTint: { value: new THREE.Color(0xffffff) },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
