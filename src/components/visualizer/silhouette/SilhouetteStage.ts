@@ -182,7 +182,7 @@ export class SilhouetteStage {
       uniforms: {
         uScene: { value: null },
         uIntensity: { value: 1 }, uTime: { value: 0 }, uBass: { value: 0 },
-        uBrightness: { value: 2.6 }, uHueShift: { value: 0 }, uSaturation: { value: 1.7 },
+        uBrightness: { value: 1.4 }, uHueShift: { value: 0 }, uSaturation: { value: 1.25 },
         uTint: { value: new THREE.Color(0xffffff) },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
@@ -209,7 +209,7 @@ export class SilhouetteStage {
           // Saturation boost
           float lum = dot(scene, vec3(0.299, 0.587, 0.114));
           scene = mix(vec3(lum), scene, uSaturation);
-          vec3 col = scene * uBrightness * (1.0 + uBass * 0.6);
+          vec3 col = scene * uBrightness * (1.0 + uBass * 0.25);
           col = hueShift(col, uHueShift + uBass * 0.08);
           col *= uTint;
           gl_FragColor = vec4(col * uIntensity, 1.0);
@@ -498,19 +498,20 @@ export class SilhouetteStage {
     }
     if (this.interiorMat) {
       const u = this.interiorMat.uniforms;
-      u.uIntensity.value = this.intensity; u.uTime.value = t; u.uBass.value = f.bass;
+      u.uIntensity.value = this.intensity * 0.85; u.uTime.value = t; u.uBass.value = f.bass;
       u.uHueShift.value = Math.sin(t * 0.07) * 0.08;
     }
     if (this.godRayMat) {
       const u = this.godRayMat.uniforms;
       (u.uColorA.value as THREE.Color).copy(this.palette.get(0));
       (u.uColorB.value as THREE.Color).copy(this.palette.get(2));
-      u.uIntensity.value = this.intensity * 0.8;
-      u.uBass.value = f.bass; u.uTime.value = t; u.uAspect.value = aspect;
+      // Much softer god-rays — they were dominating the frame.
+      u.uIntensity.value = this.intensity * 0.25;
+      u.uBass.value = f.bass * 0.5; u.uTime.value = t; u.uAspect.value = aspect;
     }
     if (this.haloMat) {
       const u = this.haloMat.uniforms;
-      u.uTime.value = t; u.uBass.value = f.bass; u.uIntensity.value = this.intensity * 0.6;
+      u.uTime.value = t; u.uBass.value = f.bass * 0.6; u.uIntensity.value = this.intensity * 0.3;
       (u.uColorA.value as THREE.Color).copy(this.palette.get(1));
       (u.uColorB.value as THREE.Color).copy(this.palette.get(3));
     }
