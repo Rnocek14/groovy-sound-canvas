@@ -78,7 +78,7 @@ export class AudioEngine {
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.7;
+    analyser.smoothingTimeConstant = 0.45;
     source.connect(analyser);
     this.ctx = ctx;
     this.source = source;
