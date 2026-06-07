@@ -209,7 +209,7 @@ export class SilhouetteStage {
           // Saturation boost
           float lum = dot(scene, vec3(0.299, 0.587, 0.114));
           scene = mix(vec3(lum), scene, uSaturation);
-          vec3 col = scene * uBrightness * (1.0 + uBass * 0.6);
+          vec3 col = scene * uBrightness * (1.0 + uBass * 0.25);
           col = hueShift(col, uHueShift + uBass * 0.08);
           col *= uTint;
           gl_FragColor = vec4(col * uIntensity, 1.0);
