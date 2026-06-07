@@ -1,72 +1,47 @@
-# Live camera feed as a trippy visual source
+## Goal
+Make the visualizer feel like it is being driven by the music, not by its own constant tunnel/clock speed.
 
-Hook the device camera into the existing `MediaBank` as a fourth source (alongside built-in / upload / AI). The camera becomes a live `THREE.VideoTexture` that the existing media modules (MediaKaleido, SlitScan, CollageStrobe) already know how to abuse — so the trippy treatment comes for free.
+## What the scan found
+- **The audio engine is read twice per frame**: `VisualizerStage` reads audio, and `VideoBackdrop` also calls `audioEngine.read()`. That mutates beat history twice and can make beats feel off or inconsistent.
+- **The backdrop is always moving**: `VideoBackdrop` rotates with wall-clock time even when the music is quiet.
+- **The bar clock free-runs at 120 BPM**: `BarClock` advances even before it has reliable detected beats, so bar/remix/camera events can happen at an invented tempo.
+- **Drop events can fire twice**: both `ArchetypeDirector` and `RemixDirector` emit `drop`, which can double-trigger impulses.
+- **Several modules still use raw time**: `FluidShader`, `MetaBalls`, `RibbonField`, `NeonGrid`, `ParticleSwarm`, `Plexus`, `Supershape`, `SlitScan`, `MediaKaleido`, `Wormhole`, and `VideoBackdrop` keep some motion alive from `t`/wall-clock rather than music phase.
+- **Tunnel still has baseline conveyor speed**: even after slowing it down, `TunnelRings` still moves every frame from a nonzero baseline plus smoothed energy.
 
-## What gets built
+## Implementation plan
+1. **Make audio single-source per frame**
+   - Stop `VideoBackdrop` from calling `audioEngine.read()`.
+   - Use `audioEngine.getLastFrame()` for passive UI/backdrop consumers.
+   - Keep `VisualizerStage` as the single owner that advances audio analysis.
 
-### 1. CameraSource (new) — `src/components/visualizer/media/CameraSource.ts`
-- Wraps `navigator.mediaDevices.getUserMedia({ video: { facingMode } })`.
-- Creates a hidden `<video>`, plays the stream, exposes a `THREE.VideoTexture`.
-- Methods: `start(facing)`, `stop()`, `flip()` (front/back), `isActive`.
-- Registers itself in `MediaBank` as a special entry with id `live-camera`, source `"camera"`, archetypes `["*"]` so it's always picked when present.
-- Mirror flag for front camera so selfies aren't reversed.
+2. **Add a proper music pulse envelope**
+   - Add derived values based on `sinceBeat`, `beat`, `drop`, bass, flux, and level: a fast beat pulse, a slower groove pulse, and an energy gate.
+   - Use these values to drive motion instead of raw wall-clock time.
 
-### 2. MediaBank changes — `MediaBank.ts`
-- New source kind: `"camera"`.
-- `attachCamera(texture, videoEl)` / `detachCamera()` so MediaBank owns the lifecycle entry.
-- Bias `pick()` to **prefer the live camera** when active (e.g. 60% of picks return it) — that's what makes the experience feel "you, but trippy."
+3. **Fix beat/tempo locking**
+   - Tune beat detection to avoid tiny constant triggers from noise.
+   - Raise the minimum beat gap slightly so the visual rhythm cannot race.
+   - Make `BarClock` trust detected BPM only after confidence builds, and avoid bar/remix events while audio energy/confidence is too low.
 
-### 3. New dedicated camera-only module — `CameraEcho.ts`
-A purpose-built module just for the live feed, separate from the generic media modules, so the camera always has a strong showcase even when generic modules don't pick it:
-- **Feedback echo + kaleido + RGB split + edge-detect Sobel** on the camera frame.
-- Cuts/pulses on beat: invert / posterize / scanlines flash on transients.
-- Mirror toggle for front camera.
-- Tempo-locked color cycling driven by `BarClock` (already exists).
-- Falls back to a "camera off" idle state when no stream.
+4. **Remove duplicate/drop over-triggering**
+   - Let only one director relay drop events.
+   - Keep macro/remix changes bar/beat-locked, not timer-only.
 
-This is registered in `presetPools.ts` `ALL` so the archetype director can weight it heavily when the camera is on.
+5. **Make tunnel movement beat-driven**
+   - Replace the tunnel’s constant z conveyor with a low idle state and beat/drop impulses.
+   - Rings should surge forward on kick/downbeat, then coast/settle; between beats they should barely move.
+   - Reduce shader wobble speed so it breathes with bass instead of spinning independently.
 
-### 4. Permission + UI — `MediaTray.tsx`
-Add a section above the upload button:
-- **"USE CAMERA"** toggle button (off by default — privacy-first, never auto-start).
-- When on: **flip front/back** button + small live thumbnail in the tray.
-- Status line: "Live camera active" or "Permission denied — tap to retry".
-- Tooltip note: "Camera feed stays on your device — never sent anywhere."
+6. **Retune always-moving modules**
+   - Convert raw `t` usage in major modules to local audio phases that advance mostly from bass/beat/level.
+   - Reduce or remove baseline speeds in starfield, wormhole, neon grid, ribbons, fluid, metaballs, particles, media kaleido, and slit-scan.
+   - Keep small ambient drift only where needed so the screen doesn’t freeze completely.
 
-### 5. Archetype bias bump
-In `archetypes.ts`, add a soft weight boost for `camera-echo` across all archetypes when camera is active — handled in `ArchetypeDirector` / `Composer.applyArchetype` via a runtime weight injection rather than hard-coding in every archetype.
+7. **Tone down the constant backdrop motion**
+   - Make backdrop scale/rotate respond to bass/beat pulse only.
+   - Remove the slow always-on rotation that matches the “blob tunneling at its own speed” complaint.
 
-### 6. Cleanup hooks
-- Stop tracks on `Composer.dispose()` and on tab `visibilitychange === "hidden"` (saves battery; resume on visible).
-- Stop on `EXIT` button in `ControlsDock`.
-
-## Privacy & permissions
-
-- Camera is **opt-in**, never auto-prompted. The PermissionGate already handles mic — we don't bundle camera with it.
-- Frames never leave the device. The AI archetype/mediagen calls already send only numeric audio features, not pixels — and that stays true.
-- Add `Permissions-Policy: camera=(self)` consideration in docs only (no code change needed for our domain).
-
-## Files
-
-**New**
-- `src/components/visualizer/media/CameraSource.ts`
-- `src/components/visualizer/modules/media/CameraEcho.ts`
-
-**Edited**
-- `src/components/visualizer/media/MediaBank.ts` — camera entry + biased pick
-- `src/components/visualizer/composer/presetPools.ts` — register `CameraEcho`
-- `src/components/visualizer/composer/archetypes.ts` — soft `mediaFavor` entry for camera
-- `src/components/visualizer/MediaTray.tsx` — camera toggle + flip + thumbnail
-- `src/components/visualizer/composer/Composer.ts` — runtime hint boost when camera live
-
-## Out of scope
-
-- No ML on the camera (face detection / pose) — too heavy for mobile and adds permission scope creep. Can be a follow-up.
-- No screen-capture (`getDisplayMedia`) — distinct UX; ask separately if wanted.
-- No recording / saving frames.
-
-## Risks
-
-- iOS Safari requires `playsinline` + user gesture before `video.play()` — handled by toggling from a button tap.
-- Low-light cameras look noisy; the trippy chain mostly hides this, and the SlitScan/Kaleido shaders amplify motion which is the point.
-- Mobile thermal: only one video decode at a time (camera OR a user-uploaded video), enforced in `MediaBank.pick()`.
+8. **Validate by checking the live signal**
+   - Confirm the preview no longer has constant scale/rotate changes when music is low.
+   - Confirm beat events, tunnel surges, flashes, and camera impulses happen on detected music pulses rather than at a fixed invented tempo.

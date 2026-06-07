@@ -22,7 +22,11 @@ export class BarClock {
       this.bpm = this.bpm * 0.92 + f.bpm * 0.08;
     }
     const bps = this.bpm / 60;
-    this.beatPhase += dt * bps;
+    // Only advance the clock when there is real audio energy AND we have some
+    // beat confidence. Otherwise the clock free-runs at 120bpm and the whole
+    // visualizer feels like it's moving without the music.
+    const gate = Math.min(1, this.confidence * 1.5) * Math.min(1, f.energy * 12);
+    this.beatPhase += dt * bps * gate;
 
     if (f.beat) {
       // align phase to 0 on actual beat, but ease toward it
@@ -31,10 +35,10 @@ export class BarClock {
       const err = wrapped > 0.5 ? wrapped - 1 : wrapped; // signed distance to 0
       // ease 60% of the error away — avoids visible jumps
       this.beatPhase -= err * 0.6;
-      this.confidence = Math.min(1, this.confidence + 0.08);
+      this.confidence = Math.min(1, this.confidence + 0.1);
       this.lastBeatT = t;
     } else {
-      this.confidence = Math.max(0, this.confidence - dt * 0.02);
+      this.confidence = Math.max(0, this.confidence - dt * 0.04);
     }
 
     while (this.beatPhase >= 1) {

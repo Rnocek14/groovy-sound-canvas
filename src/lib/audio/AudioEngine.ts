@@ -47,7 +47,7 @@ export class AudioEngine {
   private energyHistory: number[] = [];
   private historySize = 43; // ~0.7s at 60fps
   private lastBeatAt = 0;
-  private minBeatGap = 0.18; // seconds
+  private minBeatGap = 0.22; // seconds (≈ 270bpm ceiling)
 
   // Drop detection
   private levelHistory: number[] = [];
@@ -167,14 +167,15 @@ export class AudioEngine {
       variance += d * d;
     }
     variance = hist.length ? variance / hist.length : 0;
-    const threshold = mean + Math.max(0.04, Math.sqrt(variance) * 1.4);
+    const threshold = mean + Math.max(0.06, Math.sqrt(variance) * 1.6);
 
     hist.push(bass);
     if (hist.length > this.historySize) hist.shift();
 
     let beat = false;
     const sinceBeat = now - this.lastBeatAt;
-    if (bass > threshold && bass > 0.18 && sinceBeat > this.minBeatGap) {
+    // Require both an above-threshold spike AND meaningful bass energy
+    if (bass > threshold && bass > 0.22 && this.levelEMA > 0.05 && sinceBeat > this.minBeatGap) {
       beat = true;
       this.lastBeatAt = now;
       this.beatTimes.push(now);
