@@ -45,20 +45,23 @@ export const createSupershape: ModuleFactory = ({ scene, palette, events }) => {
   const mesh = new THREE.Mesh(geo, mat);
   scene.add(mesh);
   let intensity = 0;
+  let audioPhase = 0;
   const off = events.on("kaleido-flip", () => { mat.uniforms.uM.value = 3 + Math.floor(Math.random() * 10); });
   return {
     id: "supershape",
     layer: "mid",
     setIntensity(v) { intensity = v; mesh.visible = v > 0.02; },
-    update(t, dt, f) {
-      mat.uniforms.uTime.value = t;
+    update(_t, dt, f) {
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.mid * 1.3 + f.bass * 1.0) * gate;
+      mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uBass.value = f.bass;
       mat.uniforms.uTreble.value = f.treble;
       mat.uniforms.uOpacity.value = intensity;
       (mat.uniforms.uColorA.value as THREE.Color).copy(palette.get(0));
       (mat.uniforms.uColorB.value as THREE.Color).copy(palette.get(3));
-      mesh.rotation.x += dt * (0.2 + f.mid * 0.4);
-      mesh.rotation.y += dt * (0.15 + f.treble * 0.5);
+      mesh.rotation.x += dt * (f.mid * 0.6 + f.bass * 0.3) * gate;
+      mesh.rotation.y += dt * (f.treble * 0.7 + f.bass * 0.2) * gate;
       mesh.scale.setScalar(1 + f.bass * 0.4);
     },
     dispose() { off(); geo.dispose(); mat.dispose(); scene.remove(mesh); },

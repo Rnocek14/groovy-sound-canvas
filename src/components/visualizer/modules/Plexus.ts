@@ -79,7 +79,8 @@ export const createPlexus: ModuleFactory = ({ scene, palette }) => {
       lMat.color.copy(palette.get(1));
       pMat.opacity = intensity * 0.9;
       lMat.opacity = intensity * 0.45;
-      points.rotation.y += dt * 0.05;
+      const gate = Math.min(1, f.level * 4);
+      points.rotation.y += dt * (f.mid * 0.25 + f.bass * 0.15) * gate;
       lines.rotation.y = points.rotation.y;
     },
     dispose() {

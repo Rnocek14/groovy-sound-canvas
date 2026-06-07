@@ -51,6 +51,7 @@ export const createMediaKaleido: ModuleFactory = ({ scene, events }): VModule =>
   let segTarget = 8;
   let currentTex: THREE.Texture | null = null;
   let lastSwapBeat = 0;
+  let audioPhase = 0;
 
   return {
     id: "media-kaleido",
@@ -65,10 +66,12 @@ export const createMediaKaleido: ModuleFactory = ({ scene, events }): VModule =>
         lastSwapBeat = t;
         if (Math.random() < 0.3) segTarget = [3,4,6,8,10,12][Math.floor(Math.random()*6)];
       }
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.mid * 1.0 + f.bass * 0.8) * gate;
       mat.uniforms.uSeg.value += (segTarget - mat.uniforms.uSeg.value) * 0.1;
-      mat.uniforms.uTime.value = t;
-      mat.uniforms.uRot.value += dt * (0.1 + f.mid * 0.5);
-      mat.uniforms.uZoom.value = 1.1 + Math.sin(t * 0.2) * 0.25 + f.bass * 0.3;
+      mat.uniforms.uTime.value = audioPhase;
+      mat.uniforms.uRot.value += dt * f.mid * 0.6 * gate;
+      mat.uniforms.uZoom.value = 1.15 + f.bass * 0.35;
       mat.uniforms.uBass.value = f.bass;
     },
     dispose(){ scene.remove(mesh); geo.dispose(); mat.dispose(); },

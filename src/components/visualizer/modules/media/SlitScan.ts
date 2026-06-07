@@ -49,18 +49,21 @@ export const createSlitScan: ModuleFactory = ({ scene }): VModule => {
   let intensity = 0;
   let currentTex: THREE.Texture | null = null;
   let lastSwap = 0;
+  let audioPhase = 0;
 
   return {
     id: "media-slitscan",
     layer: "bg",
     setIntensity(v){ intensity = v; mat.uniforms.uIntensity.value = v; mesh.visible = v > 0.01; },
-    update(t, _dt, f){
+    update(t, dt, f){
       if (!currentTex || (intensity > 0.01 && t - lastSwap > 6 + Math.random() * 6)) {
         currentTex = MediaBank.pick();
         mat.uniforms.uTex.value = currentTex;
         lastSwap = t;
       }
-      mat.uniforms.uTime.value = t;
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.treble * 1.4 + f.level * 1.0 + f.bass * 0.7) * gate;
+      mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uLevel.value = f.level;
       mat.uniforms.uTreble.value = f.treble;
     },

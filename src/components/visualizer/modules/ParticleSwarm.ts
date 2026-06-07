@@ -58,22 +58,25 @@ export const createParticleSwarm: ModuleFactory = ({ scene, palette, events }) =
 
   let intensity = 0;
   let burst = 0;
+  let audioPhase = 0;
   const offB = events.on("beat", () => { burst = Math.min(1, burst + 0.3); });
   const offD = events.on("drop", () => { burst = 1; });
   return {
     id: "particle-swarm",
     layer: "mid",
     setIntensity(v) { intensity = v; points.visible = v > 0.02; },
-    update(t, dt, f) {
+    update(_t, dt, f) {
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.mid * 1.2 + f.bass * 1.0 + burst * 1.5) * gate;
       burst *= Math.pow(0.001, dt);
-      mat.uniforms.uTime.value = t;
+      mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uOpacity.value = intensity * (0.7 + f.level * 0.5);
       mat.uniforms.uBurst.value = burst * (1 + f.bass * 0.5);
       mat.uniforms.uSize.value = 0.7 + f.treble * 1.2;
       (mat.uniforms.uColorA.value as THREE.Color).copy(palette.get(0));
       (mat.uniforms.uColorB.value as THREE.Color).copy(palette.get(2));
-      points.rotation.y += dt * (0.05 + f.mid * 0.2);
-      points.rotation.x += dt * 0.02;
+      points.rotation.y += dt * (f.mid * 0.3 + f.bass * 0.2) * gate;
+      points.rotation.x += dt * f.treble * 0.1 * gate;
     },
     dispose() { offB(); offD(); geo.dispose(); mat.dispose(); scene.remove(points); },
   };

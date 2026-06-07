@@ -46,13 +46,16 @@ export const createMetaBalls: ModuleFactory = ({ scene, palette }): VModule => {
   mesh.renderOrder = -500;
   scene.add(mesh);
   let intensity = 0;
+  let audioPhase = 0;
   return {
     id: "metaballs",
     layer: "mid",
     setIntensity(v){ intensity = v; mat.uniforms.uIntensity.value = v; mesh.visible = v > 0.01; },
-    update(t, _dt, f){
+    update(_t, dt, f){
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.bass * 1.8 + f.mid * 0.7 + f.flux * 0.5) * gate;
       const u = mat.uniforms;
-      u.uTime.value = t;
+      u.uTime.value = audioPhase;
       u.uBass.value = f.bass;
       u.uTreble.value = f.treble;
       u.uA.value.copy(palette.get(2));
