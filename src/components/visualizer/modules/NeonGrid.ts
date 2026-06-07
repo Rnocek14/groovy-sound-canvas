@@ -29,12 +29,15 @@ export const createNeonGrid: ModuleFactory = ({ scene, palette }) => {
   mesh.position.y = -3;
   scene.add(mesh);
   let intensity = 0;
+  let audioPhase = 0;
   return {
     id: "neon-grid",
     layer: "bg",
     setIntensity(v) { intensity = v; mesh.visible = v > 0.02; },
-    update(t, _dt, f) {
-      mat.uniforms.uTime.value = t;
+    update(_t, dt, f) {
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.bass * 2.0 + f.level * 1.2) * gate;
+      mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uBass.value = f.bass;
       mat.uniforms.uOpacity.value = intensity;
       (mat.uniforms.uColorA.value as THREE.Color).copy(palette.get(0));

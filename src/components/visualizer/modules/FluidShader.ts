@@ -68,13 +68,16 @@ export const createFluidShader: ModuleFactory = ({ scene, palette }): VModule =>
   mesh.renderOrder = -1000;
   scene.add(mesh);
   let intensity = 0;
+  let audioPhase = 0;
   return {
     id: "fluid",
     layer: "bg",
     setIntensity(v){ intensity = v; mat.uniforms.uIntensity.value = v; mesh.visible = v > 0.01; },
-    update(t, _dt, f){
+    update(_t, dt, f){
+      const gate = Math.min(1, f.level * 4);
+      audioPhase += dt * (f.mid * 1.2 + f.bass * 1.4 + f.flux * 0.6) * gate;
       const u = mat.uniforms;
-      u.uTime.value = t;
+      u.uTime.value = audioPhase;
       u.uBass.value = f.bass;
       u.uMid.value = f.mid;
       u.uTreble.value = f.treble;

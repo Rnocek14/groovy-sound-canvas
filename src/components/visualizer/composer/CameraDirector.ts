@@ -41,7 +41,8 @@ export class CameraDirector {
     if (kind === "roll") this.rollPhase = 0;
   }
   update(t: number, dt: number, f: AudioFrame) {
-    this.driftPhase += dt * (0.08 + f.level * 0.5 + f.bass * 0.8);
+    const gate = Math.min(1, f.level * 4);
+    this.driftPhase += dt * (f.level * 0.6 + f.bass * 0.9 + f.mid * 0.2) * gate;
     const mt = this.driftPhase;
     if (this.mix < 1) {
       this.mix = Math.min(1, this.mix + dt * 1.2);

@@ -46,19 +46,22 @@ export const createTunnelRings: ModuleFactory = ({ scene, palette, events }) => 
   let speedBoost = 0;
   let tunnelSpeed = 0;
   let motionPhase = 0;
-  const off = events.on("beat", () => { speedBoost = Math.min(1.0, speedBoost + 0.45); });
+  const off = events.on("beat", () => { speedBoost = Math.min(1.2, speedBoost + 0.6); });
+  const offDrop = events.on("drop", () => { speedBoost = Math.min(2.0, speedBoost + 1.2); });
 
   return {
     id: "tunnel-rings",
     layer: "mid",
     setIntensity(v) { intensity = v; group.visible = v > 0.02; },
-    update(t, dt, f) {
-      // Tame baseline: tunnel mostly idles unless beats hit
-      const targetSpeed = 0.05 + f.level * 1.4 + f.bass * 4.5 + f.flux * 2.0 + speedBoost * 6.0;
-      const follow = 1 - Math.pow(0.001, dt * 5);
+    update(_t, dt, f) {
+      // Idle to a near-stop when there's no audio. All forward motion comes
+      // from bass/beat impulses, NOT a baseline conveyor.
+      const energyGate = Math.min(1, f.level * 4);
+      const targetSpeed = (f.bass * 2.8 + speedBoost * 7.0) * energyGate;
+      const follow = 1 - Math.pow(0.001, dt * 6);
       tunnelSpeed += (targetSpeed - tunnelSpeed) * follow;
-      motionPhase += dt * (0.05 + f.mid * 0.5 + f.bass * 0.9 + speedBoost * 0.8);
-      speedBoost *= Math.pow(0.02, dt);
+      motionPhase += dt * (f.bass * 1.1 + speedBoost * 0.9 + f.mid * 0.25) * energyGate;
+      speedBoost *= Math.pow(0.04, dt);
 
       for (let i = 0; i < meshes.length; i++) {
         const m = meshes[i];
@@ -73,6 +76,7 @@ export const createTunnelRings: ModuleFactory = ({ scene, palette, events }) => 
     },
     dispose() {
       off();
+      offDrop();
       ringGeo.dispose();
       for (const m of mats) m.dispose();
       scene.remove(group);

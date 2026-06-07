@@ -32,15 +32,25 @@ export function VideoBackdrop({ enabled }: { enabled: boolean }) {
     if (!enabled) return;
     let raf = 0;
     let lastSwap = performance.now() / 1000;
+    let rot = 0; // accumulated rotation driven by bass only
+    let beatPulse = 0;
+    let prevBeat = false;
     const tick = () => {
       const now = performance.now() / 1000;
-      const f = audioEngine.read(now);
+      // Passive consumer: do NOT call read() (that would mutate beat history twice/frame)
+      const f = audioEngine.getLastFrame();
       const el = ref.current;
       if (el) {
-        const op = Math.min(0.55, 0.15 + f.level * 0.9);
+        if (f.beat && !prevBeat) beatPulse = Math.min(1, beatPulse + 0.6);
+        prevBeat = f.beat;
+        beatPulse *= 0.94;
+        // Only move when there is audio energy
+        const energyGate = Math.min(1, f.level * 2.2);
+        rot += (f.bass - 0.15) * 0.6 * energyGate;
+        const op = Math.min(0.55, 0.08 + f.level * 0.95);
         el.style.opacity = String(op);
-        el.style.transform = `scale(${1.05 + f.bass * 0.08}) rotate(${Math.sin(now * 0.15) * 4}deg)`;
-        if ((f.beat && f.bass > 0.55 && now - lastSwap > 3) || now - lastSwap > 12) {
+        el.style.transform = `scale(${1.02 + f.bass * 0.09 + beatPulse * 0.04}) rotate(${rot}deg)`;
+        if (f.beat && f.bass > 0.55 && now - lastSwap > 4) {
           idxRef.current = (idxRef.current + 1) % STYLES.length;
           Object.assign(el.style, STYLES[idxRef.current]);
           lastSwap = now;

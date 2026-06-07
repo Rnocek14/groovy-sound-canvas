@@ -421,7 +421,9 @@ export class Composer {
     this.feedbackPulse *= Math.pow(0.0001, dt);
 
     const u = this.postMat.uniforms;
-    u.uTime.value = t;
+    // Audio-gated post time so warp/glitch don't crawl independently of music
+    const gate = Math.min(1, f.level * 4);
+    u.uTime.value = (u.uTime.value as number) + dt * (0.2 + f.mid * 1.2 + f.bass * 1.4) * gate;
     u.uKaleido.value = this.kaleido;
     u.uSeg.value = this.kaleidoSeg;
     u.uWarp.value = this.warp + f.mid * 0.2;
@@ -433,8 +435,8 @@ export class Composer {
     u.uBass.value = f.bass;
     u.uFeedback.value = this.feedback;
     u.uFbReady.value = this.feedbackReady ? 1 : 0;
-    u.uFbZoom.value = f.level * 0.002 + f.bass * 0.01 + this.feedbackPulse * 0.01;
-    u.uFbRot.value = (f.treble - 0.2) * 0.0012 + this.feedbackPulse * 0.0008;
+    u.uFbZoom.value = (f.bass * 0.012 + this.feedbackPulse * 0.012) * gate;
+    u.uFbRot.value = ((f.treble - 0.2) * 0.0012 + this.feedbackPulse * 0.0008) * gate;
 
     // render scene to sceneRT
     this.renderer.setRenderTarget(this.sceneRT);

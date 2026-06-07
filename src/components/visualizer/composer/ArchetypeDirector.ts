@@ -88,7 +88,6 @@ export class ArchetypeDirector {
       if (Math.random() < arch.intensityBias * 0.15) this.events.emit("kaleido-flip");
     }
 
-    // On-drop: forward to bus
-    if (f.drop) this.events.emit("drop");
+    // Note: drop forwarding is handled by RemixDirector to avoid double-fires.
   }
 }
