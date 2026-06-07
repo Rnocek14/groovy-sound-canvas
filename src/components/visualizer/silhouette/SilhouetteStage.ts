@@ -449,9 +449,11 @@ export class SilhouetteStage {
 
   update(t: number, dt: number, f: AudioFrame, archetype: string, phase: string, w: number, h: number) {
     if (!this.enabled) { this.intensity += (0 - this.intensity) * Math.min(1, dt * 2); return; }
-    // Halo + god-rays ride at full strength even before the video loads.
-    this.intensity += (1 - this.intensity) * Math.min(1, dt * 0.8);
     this.advanceStateMachine(dt, archetype, phase, f.energy);
+    // Only ramp up intensity once the figure video is actually keying — otherwise we just paint a permanent blob.
+    const figureReady = !!this.videoTex && !this.videoFailed && (this.state === "showing" || this.state === "precipitating" || this.state === "evaporating");
+    const target = figureReady ? 1 : 0;
+    this.intensity += (target - this.intensity) * Math.min(1, dt * (figureReady ? 0.8 : 2.5));
 
     const evap = this.state === "evaporating" ? this.transitionPhase : 0;
     const precip = this.state === "precipitating" ? this.transitionPhase : this.state === "showing" ? 1 : 0;
