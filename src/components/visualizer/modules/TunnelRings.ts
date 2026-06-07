@@ -46,18 +46,20 @@ export const createTunnelRings: ModuleFactory = ({ scene, palette, events }) => 
   let speedBoost = 0;
   let tunnelSpeed = 0;
   let motionPhase = 0;
-  const off = events.on("beat", () => { speedBoost = Math.min(1.4, speedBoost + 0.7); });
+  const off = events.on("beat", () => { speedBoost = Math.min(1.0, speedBoost + 0.45); });
 
   return {
     id: "tunnel-rings",
     layer: "mid",
     setIntensity(v) { intensity = v; group.visible = v > 0.02; },
     update(t, dt, f) {
-      const targetSpeed = 0.25 + f.level * 7 + f.bass * 22 + f.flux * 12 + speedBoost * 14;
-      const follow = 1 - Math.pow(0.001, dt * 7);
+      // Tame baseline: tunnel mostly idles unless beats hit
+      const targetSpeed = 0.05 + f.level * 1.4 + f.bass * 4.5 + f.flux * 2.0 + speedBoost * 6.0;
+      const follow = 1 - Math.pow(0.001, dt * 5);
       tunnelSpeed += (targetSpeed - tunnelSpeed) * follow;
-      motionPhase += dt * (0.18 + f.mid * 1.4 + f.bass * 2.2 + speedBoost * 1.5);
-      speedBoost *= Math.pow(0.0001, dt);
+      motionPhase += dt * (0.05 + f.mid * 0.5 + f.bass * 0.9 + speedBoost * 0.8);
+      speedBoost *= Math.pow(0.02, dt);
+
       for (let i = 0; i < meshes.length; i++) {
         const m = meshes[i];
         m.position.z += tunnelSpeed * dt;
