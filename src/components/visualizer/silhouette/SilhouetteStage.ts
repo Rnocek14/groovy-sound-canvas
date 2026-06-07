@@ -498,19 +498,20 @@ export class SilhouetteStage {
     }
     if (this.interiorMat) {
       const u = this.interiorMat.uniforms;
-      u.uIntensity.value = this.intensity; u.uTime.value = t; u.uBass.value = f.bass;
+      u.uIntensity.value = this.intensity * 0.85; u.uTime.value = t; u.uBass.value = f.bass;
       u.uHueShift.value = Math.sin(t * 0.07) * 0.08;
     }
     if (this.godRayMat) {
       const u = this.godRayMat.uniforms;
       (u.uColorA.value as THREE.Color).copy(this.palette.get(0));
       (u.uColorB.value as THREE.Color).copy(this.palette.get(2));
-      u.uIntensity.value = this.intensity * 0.8;
-      u.uBass.value = f.bass; u.uTime.value = t; u.uAspect.value = aspect;
+      // Much softer god-rays — they were dominating the frame.
+      u.uIntensity.value = this.intensity * 0.25;
+      u.uBass.value = f.bass * 0.5; u.uTime.value = t; u.uAspect.value = aspect;
     }
     if (this.haloMat) {
       const u = this.haloMat.uniforms;
-      u.uTime.value = t; u.uBass.value = f.bass; u.uIntensity.value = this.intensity * 0.6;
+      u.uTime.value = t; u.uBass.value = f.bass * 0.6; u.uIntensity.value = this.intensity * 0.3;
       (u.uColorA.value as THREE.Color).copy(this.palette.get(1));
       (u.uColorB.value as THREE.Color).copy(this.palette.get(3));
     }
