@@ -61,17 +61,18 @@ export class RemixDirector {
       }
     }
     if (f.beat) this.events.emit("beat");
-    if (t >= this.nextMacro) {
+    const onPulse = f.beat || f.drop;
+    if (t >= this.nextMacro && onPulse) {
       this.events.emit("remix");
       this.nextMacro = this.roll(t, this.opts.macroMin, this.opts.macroMax);
     }
-    if (t >= this.nextMeso) {
+    if (t >= this.nextMeso && onPulse) {
       // meso = palette half-rotate or partial palette flip
       if (Math.random() < 0.4) this.events.emit("palette-flip");
       else this.events.emit("kaleido-flip");
       this.nextMeso = this.roll(t, this.opts.mesoMin, this.opts.mesoMax);
     }
-    if (t >= this.nextMicro) {
+    if (t >= this.nextMicro && onPulse) {
       const k = MICRO_KINDS[Math.floor(Math.random() * MICRO_KINDS.length)];
       this.events.emit(k);
       this.nextMicro = this.roll(t, this.opts.microMin, this.opts.microMax);

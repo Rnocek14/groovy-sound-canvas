@@ -40,12 +40,14 @@ export const createStarfield: ModuleFactory = ({ scene, palette }) => {
   const points = new THREE.Points(geo, mat);
   scene.add(points);
   let intensity = 0;
+  let audioPhase = 0;
   return {
     id: "starfield",
     layer: "bg",
     setIntensity(v) { intensity = v; points.visible = v > 0.02; },
-    update(t, _dt, f) {
-      mat.uniforms.uTime.value = t * (1 + f.bass * 1.5);
+    update(_t, dt, f) {
+      audioPhase += dt * (0.12 + f.level * 5 + f.bass * 8 + f.flux * 4);
+      mat.uniforms.uTime.value = audioPhase;
       mat.uniforms.uOpacity.value = intensity * (0.7 + f.treble * 0.5);
       (mat.uniforms.uColor.value as THREE.Color).copy(palette.get(0)).lerp(new THREE.Color(0xffffff), 0.5);
     },
