@@ -17,28 +17,29 @@ export class BarClock {
 
   /** Push the latest audio frame; advances phase by dt. */
   update(t: number, dt: number, f: AudioFrame) {
+    // Trust the AudioEngine's tempo tracker immediately when it has a reading.
+    // Engine publishes beatPhase/barPhase too — we mirror tempo here so existing
+    // consumers (consumeBar, consumeBeat) keep working without a 10s stall.
     if (f.bpm > 60 && f.bpm < 200) {
-      // smooth BPM
-      this.bpm = this.bpm * 0.92 + f.bpm * 0.08;
+      this.bpm = this.bpm * 0.85 + f.bpm * 0.15;
     }
     const bps = this.bpm / 60;
-    // Only advance the clock when there is real audio energy AND we have some
-    // beat confidence. Otherwise the clock free-runs at 120bpm and the whole
-    // visualizer feels like it's moving without the music.
-    const gate = Math.min(1, this.confidence * 1.5) * Math.min(1, f.energy * 12);
+    // Soft gate: still advance when audio is quiet, just slower, so the grid
+    // keeps ticking through breakdowns instead of stalling entirely.
+    const gate = 0.25 + 0.75 * Math.min(1, f.energy * 8);
     this.beatPhase += dt * bps * gate;
 
     if (f.beat) {
-      // align phase to 0 on actual beat, but ease toward it
-      // wrap-aware shortest path
       const wrapped = this.beatPhase - Math.floor(this.beatPhase);
-      const err = wrapped > 0.5 ? wrapped - 1 : wrapped; // signed distance to 0
-      // ease 60% of the error away — avoids visible jumps
+      const err = wrapped > 0.5 ? wrapped - 1 : wrapped;
       this.beatPhase -= err * 0.6;
-      this.confidence = Math.min(1, this.confidence + 0.1);
+      this.confidence = Math.min(1, this.confidence + 0.15);
       this.lastBeatT = t;
     } else {
-      this.confidence = Math.max(0, this.confidence - dt * 0.04);
+      this.confidence = Math.max(0, this.confidence - dt * 0.03);
+    }
+    if (f.bpmConfidence > this.confidence) {
+      this.confidence = this.confidence * 0.9 + f.bpmConfidence * 0.1;
     }
 
     while (this.beatPhase >= 1) {

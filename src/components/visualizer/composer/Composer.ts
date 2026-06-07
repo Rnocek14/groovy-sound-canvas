@@ -53,6 +53,7 @@ export class Composer {
   private feedbackPulse = 0;
   private kaleidoSeg = 6;
   private feedbackReady = false;
+  private _ppPhase = 0;
   private silhouette: SilhouetteStage | null = null;
 
   constructor(canvas: HTMLCanvasElement, preset: PresetId) {
@@ -131,11 +132,17 @@ export class Composer {
         uFlash: { value: 0 },
         uInvert: { value: 0 },
         uBass: { value: 0 },
+        uBassTrans: { value: 0 },
+        uTrebleTrans: { value: 0 },
         uVignette: { value: 0.4 },
         uFeedback: { value: 0.6 },
         uFbReady: { value: 0 },
         uFbZoom: { value: 0 },
         uFbRot: { value: 0 },
+        // Per-pixel warp field amplitudes (the Milkdrop trick)
+        uPpWarpA: { value: 0 },     // big bass-driven octave
+        uPpWarpB: { value: 0 },     // fine treble-driven octave
+        uPpPhase: { value: 0 },     // advances with music
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
       fragmentShader: `
@@ -145,7 +152,10 @@ export class Composer {
         uniform sampler2D uPrev;
         uniform float uTime, uKaleido, uSeg, uWarp, uChroma;
         uniform float uScanlines, uGlitch, uFlash, uInvert, uBass, uVignette;
+        uniform float uBassTrans, uTrebleTrans;
         uniform float uFeedback, uFbReady, uFbZoom, uFbRot;
+        uniform float uPpWarpA, uPpWarpB, uPpPhase;
+
         vec2 kaleido(vec2 uv, float seg){
           vec2 p = uv - 0.5;
           float a = atan(p.y, p.x);
@@ -158,6 +168,22 @@ export class Composer {
         }
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         mat2 rot(float a){ float c=cos(a),s=sin(a); return mat2(c,-s,s,c); }
+        // value-noise gradient (smooth) — returns vec2 in roughly [-1,1]
+        float vnoise(vec2 p){
+          vec2 i = floor(p); vec2 f = fract(p);
+          vec2 u = f*f*(3.0-2.0*f);
+          float a = hash(i);
+          float b = hash(i + vec2(1.0,0.0));
+          float c = hash(i + vec2(0.0,1.0));
+          float d = hash(i + vec2(1.0,1.0));
+          return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+        }
+        vec2 warpField(vec2 uv, float phase, float scale){
+          // sample noise at offset positions to get a smooth vector field
+          float n1 = vnoise(uv * scale + vec2(phase, phase*0.7));
+          float n2 = vnoise(uv * scale + vec2(-phase*0.6, phase*1.1) + 17.0);
+          return vec2(n1, n2) - 0.5;
+        }
         void main(){
           vec2 uv = vUv;
           vec2 kuv = kaleido(uv, uSeg);
@@ -173,15 +199,19 @@ export class Composer {
           col.g = texture2D(uTex, uv).g;
           col.b = texture2D(uTex, uv - vec2(c, 0.0)).b;
 
-          // Feedback echo of previous frame (warped + faded)
+          // ---- Feedback echo with per-pixel warp ----
           if (uFbReady > 0.5 && uFeedback > 0.01) {
             vec2 p = vUv - 0.5;
             p = rot(uFbRot) * p;
             p *= 1.0 - uFbZoom;
             vec2 fuv = p + 0.5;
+            // Per-pixel warp field — the morphing/liquid Milkdrop look.
+            vec2 wA = warpField(fuv, uPpPhase, 3.5) * uPpWarpA;
+            vec2 wB = warpField(fuv, uPpPhase * 1.7, 9.0) * uPpWarpB;
+            fuv += wA + wB;
             vec3 prev = texture2D(uPrev, fuv).rgb;
-            // screen-blend so bright trails stay bright
-            vec3 fade = prev * (0.86 + uFeedback*0.12);
+            vec3 fade = prev * (0.88 + uFeedback*0.10);
+            // screen blend keeps bright trails alive
             col = 1.0 - (1.0 - col) * (1.0 - fade * uFeedback);
           }
 
@@ -254,9 +284,10 @@ export class Composer {
 
   private remix(initial: boolean) {
     // Camera (when live) is a persistent background layer — not subject to remix.
+    // Waveform is always-on top overlay (Milkdrop-style legibility).
     const camLive = MediaBank.hasCamera();
     const weighted = this.all
-      .filter((m) => m.id !== "camera-echo")
+      .filter((m) => m.id !== "camera-echo" && m.id !== "waveform")
       .map((m) => {
         const base = this.hintWeights.get(m.id) ?? 1;
         return { m, w: base * (0.5 + Math.random()) };
@@ -267,7 +298,6 @@ export class Composer {
     const layers = new Set<string>();
     for (const { m } of weighted) {
       if (pick.length >= target) break;
-      // When camera is live it owns the bg layer — allow other bg modules to be skipped more
       if (layers.has(m.layer) && Math.random() < 0.35) continue;
       if (camLive && m.layer === "bg" && Math.random() < 0.6) continue;
       pick.push(m);
@@ -284,8 +314,9 @@ export class Composer {
     const activeIds = new Set(pick.map((m) => m.id));
     this.active_target.clear();
     for (const m of this.all) this.active_target.set(m.id, activeIds.has(m.id) ? 1 : 0);
-    // Pin camera-echo on whenever camera stream is live
     if (camLive) this.active_target.set("camera-echo", 1);
+    // Always-on waveform overlay
+    this.active_target.set("waveform", 1);
 
     this.cam.pick();
     if (!initial) {
@@ -404,8 +435,9 @@ export class Composer {
       m.update(t, dt, f, nv);
     }
 
-    // ease post values toward targets
-    const ease = 1 - Math.pow(0.001, dt * 0.6);
+    // ease post values toward targets — snap fast on beat, settle slowly
+    const easeRate = f.beat ? 6.0 : (f.bassTransient > 0.15 ? 3.0 : 0.8);
+    const ease = 1 - Math.pow(0.001, dt * easeRate);
     this.kaleido += (this.kaleidoT - this.kaleido) * ease;
     this.warp += (this.warpT - this.warp) * ease;
     this.chroma += (this.chromaT - this.chroma) * ease;
@@ -421,22 +453,31 @@ export class Composer {
     this.feedbackPulse *= Math.pow(0.0001, dt);
 
     const u = this.postMat.uniforms;
-    // Audio-gated post time so warp/glitch don't crawl independently of music
+    // Audio-gated post time — warp/glitch breathe with music, not wall-clock.
     const gate = Math.min(1, f.level * 4);
     u.uTime.value = (u.uTime.value as number) + dt * (0.2 + f.mid * 1.2 + f.bass * 1.4) * gate;
     u.uKaleido.value = this.kaleido;
     u.uSeg.value = this.kaleidoSeg;
     u.uWarp.value = this.warp + f.mid * 0.2;
-    u.uChroma.value = this.chroma + f.bass * 0.2;
+    u.uChroma.value = this.chroma + f.bass * 0.2 + (f.bassTransient ?? 0) * 0.3;
     u.uScanlines.value = this.scanlines;
     u.uGlitch.value = this.glitch;
-    u.uFlash.value = this.flash * 0.6;
+    u.uFlash.value = this.flash * 0.6 + (f.bassTransient ?? 0) * 0.15;
     u.uInvert.value = this.invert > 0.1 ? 1 : 0;
     u.uBass.value = f.bass;
+    u.uBassTrans.value = f.bassTransient ?? 0;
+    u.uTrebleTrans.value = f.trebleTransient ?? 0;
     u.uFeedback.value = this.feedback;
     u.uFbReady.value = this.feedbackReady ? 1 : 0;
-    u.uFbZoom.value = (f.bass * 0.012 + this.feedbackPulse * 0.012) * gate;
-    u.uFbRot.value = ((f.treble - 0.2) * 0.0012 + this.feedbackPulse * 0.0008) * gate;
+    // Cranked feedback magnitudes (was 0.012 / 0.0012) — now visible.
+    u.uFbZoom.value = (f.bass * 0.045 + this.feedbackPulse * 0.05) * gate;
+    u.uFbRot.value = ((f.treble - 0.2) * 0.012 + this.feedbackPulse * 0.008) * gate;
+    // Per-pixel warp: bass drives big slow morph, treble drives fine detail.
+    // Phase advances with music, so morphing freezes when audio stops.
+    this._ppPhase = (this._ppPhase ?? 0) + dt * (0.3 + f.bass * 1.4 + f.mid * 0.3) * gate;
+    u.uPpPhase.value = this._ppPhase;
+    u.uPpWarpA.value = (0.006 + f.bass * 0.025 + (f.bassTransient ?? 0) * 0.04 + this.feedbackPulse * 0.02) * gate;
+    u.uPpWarpB.value = (0.001 + f.treble * 0.008 + (f.trebleTransient ?? 0) * 0.015) * gate;
 
     // render scene to sceneRT
     this.renderer.setRenderTarget(this.sceneRT);
