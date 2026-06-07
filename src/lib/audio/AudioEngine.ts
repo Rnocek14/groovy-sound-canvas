@@ -137,10 +137,10 @@ export class AudioEngine {
     const level = Math.min(1, levelRaw * s * 2);
 
     // Smoothed
-    this.bassEMA = this.bassEMA * 0.6 + bass * 0.4;
-    this.midEMA = this.midEMA * 0.6 + mid * 0.4;
-    this.trebleEMA = this.trebleEMA * 0.5 + treble * 0.5;
-    this.levelEMA = this.levelEMA * 0.6 + level * 0.4;
+    this.bassEMA = this.bassEMA * 0.35 + bass * 0.65;
+    this.midEMA = this.midEMA * 0.45 + mid * 0.55;
+    this.trebleEMA = this.trebleEMA * 0.4 + treble * 0.6;
+    this.levelEMA = this.levelEMA * 0.4 + level * 0.6;
 
     // Beat: bass energy spike vs history
     const hist = this.energyHistory;
